@@ -220,6 +220,9 @@ class CrmStore extends ChangeNotifier {
       'student-4': AttendanceStatus.absent,
     },
   };
+  // lessonId -> studentId -> "HH:mm" the student actually arrived. Only set
+  // for present/late; absent has no arrival time.
+  final Map<String, Map<String, String>> attendanceTimes = {};
 
   final results = <HomeworkResult>[
     HomeworkResult(
@@ -453,18 +456,24 @@ class CrmStore extends ChangeNotifier {
       );
 
     attendance.clear();
+    attendanceTimes.clear();
     final attendanceRows = List<Map<String, dynamic>>.from(
       await database.from('attendance').select(),
     );
     for (final row in attendanceRows) {
       final student = enrollmentById[row['enrollment_id'].toString()];
       if (student == null) continue;
-      attendance.putIfAbsent(
-        row['lesson_id'].toString(),
-        () => {},
-      )[student.id] = _attendance(
+      final lessonId = row['lesson_id'].toString();
+      attendance.putIfAbsent(lessonId, () => {})[student.id] = _attendance(
         row['status'].toString(),
       );
+      final arrivedAt = row['arrived_at'] as String?;
+      if (arrivedAt != null) {
+        attendanceTimes.putIfAbsent(
+          lessonId,
+          () => {},
+        )[student.id] = arrivedAt.substring(0, 5);
+      }
     }
 
     results.clear();
@@ -527,12 +536,16 @@ class CrmStore extends ChangeNotifier {
 
   Future<void> saveAttendance(
     String lessonId,
-    Map<String, AttendanceStatus> values,
-  ) async {
+    Map<String, AttendanceStatus> values, {
+    Map<String, String?> times = const {},
+  }) async {
     final groupId = lessons
         .firstWhere((l) => l.id == resolveId(lessonId))
         .groupId;
     final changes = Map<String, AttendanceStatus>.of(values);
+    // Absent has no arrival time even if one was entered before switching.
+    String? arrivalOf(String studentId) =>
+        changes[studentId] == AttendanceStatus.absent ? null : times[studentId];
     if (!canManageGroup(groupId))
       throw StateError('Davomatni belgilashga ruxsat yo‘q.');
     for (final id in changes.keys) {
@@ -550,6 +563,15 @@ class CrmStore extends ChangeNotifier {
             changes.keys.any((s) => !studentById(s, groupId).active))
           throw StateError('Faqat aktiv o‘quvchi davomatini belgilang.');
         attendance.putIfAbsent(id, () => {}).addAll(changes);
+        final lessonTimes = attendanceTimes.putIfAbsent(id, () => {});
+        for (final studentId in changes.keys) {
+          final arrival = arrivalOf(studentId);
+          if (arrival == null) {
+            lessonTimes.remove(studentId);
+          } else {
+            lessonTimes[studentId] = arrival;
+          }
+        }
       },
       send: () async {
         if (changes.isEmpty) return;
@@ -565,6 +587,7 @@ class CrmStore extends ChangeNotifier {
                         studentById(entry.key, groupId).enrollmentId,
                       ),
                       'status': entry.value.name,
+                      'arrived_at': arrivalOf(entry.key),
                       'marked_by': int.parse(actor.membershipId),
                       'updated_at': DateTime.now().toUtc().toIso8601String(),
                     },
@@ -1064,6 +1087,10 @@ class _CrmSnapshot {
         for (final entry in store.attendance.entries)
           entry.key: Map.of(entry.value),
       },
+      attendanceTimes = {
+        for (final entry in store.attendanceTimes.entries)
+          entry.key: Map.of(entry.value),
+      },
       results = store.results
           .map(
             (r) => HomeworkResult(
@@ -1089,6 +1116,7 @@ class _CrmSnapshot {
   final List<Homework> homeworks;
   final AppRole role;
   final Map<String, Map<String, AttendanceStatus>> attendance;
+  final Map<String, Map<String, String>> attendanceTimes;
   final List<HomeworkResult> results;
   final List<LessonCheckin> checkins;
   final Map<String, Uint8List> checkinImages;
@@ -1127,6 +1155,12 @@ class _CrmSnapshot {
       ..clear()
       ..addAll({
         for (final entry in attendance.entries) entry.key: Map.of(entry.value),
+      });
+    store.attendanceTimes
+      ..clear()
+      ..addAll({
+        for (final entry in attendanceTimes.entries)
+          entry.key: Map.of(entry.value),
       });
     final current = {
       for (final r in store.results) (r.homeworkId, r.studentId): r,

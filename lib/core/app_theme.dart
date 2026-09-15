@@ -81,6 +81,11 @@ ThemeData buildTheme({Brightness brightness = Brightness.light}) => ThemeData(
     style: FilledButton.styleFrom(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      // The button's own blue fill is constant in both themes, so its label
+      // should always read in white rather than following onPrimary, which
+      // can shift with the seeded color scheme.
+      foregroundColor: Colors.white,
+      iconColor: Colors.white,
     ),
   ),
   // A tappable row's hover/splash highlight should hug its own rounded

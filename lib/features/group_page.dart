@@ -590,6 +590,7 @@ class _AttendanceTab extends StatefulWidget {
 class _AttendanceTabState extends State<_AttendanceTab> {
   String? lessonId;
   Map<String, AttendanceStatus> values = {};
+  Map<String, String> times = {};
 
   @override
   Widget build(BuildContext context) {
@@ -607,6 +608,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
     if (!lessons.any((lesson) => lesson.id == lessonId)) {
       lessonId = lessons.first.id;
       values.clear();
+      times.clear();
     }
     final lesson = lessons.firstWhere((item) => item.id == lessonId);
     final students = _visibleStudents(widget.store, widget.group.id);
@@ -636,6 +638,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                   onChanged: (id) => setState(() {
                     lessonId = id;
                     values.clear();
+                    times.clear();
                   }),
                 ),
               );
@@ -672,6 +675,9 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                       selected == AttendanceStatus.present ||
                       selected == AttendanceStatus.late;
                   final late = selected == AttendanceStatus.late;
+                  final arrivedAt =
+                      times[student.id] ??
+                      widget.store.attendanceTimes[lesson.id]?[student.id];
                   final canEdit =
                       widget.store.canMarkLesson(lesson) &&
                       (student.active ||
@@ -714,6 +720,31 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                                       : AttendanceStatus.present,
                                 ),
                         ),
+                      if (came)
+                        ActionChip(
+                          avatar: const Icon(Icons.schedule, size: 16),
+                          label: Text(arrivedAt ?? 'Vaqt kiritish'),
+                          onPressed: !canEdit
+                              ? null
+                              : () async {
+                                  final parsed = arrivedAt?.split(':');
+                                  final picked = await showTimePicker(
+                                    context: context,
+                                    initialTime: parsed == null
+                                        ? TimeOfDay.now()
+                                        : TimeOfDay(
+                                            hour: int.parse(parsed[0]),
+                                            minute: int.parse(parsed[1]),
+                                          ),
+                                  );
+                                  if (picked == null) return;
+                                  setState(
+                                    () => times[student.id] =
+                                        '${picked.hour.toString().padLeft(2, '0')}:'
+                                        '${picked.minute.toString().padLeft(2, '0')}',
+                                  );
+                                },
+                        ),
                     ],
                   );
                   if (constraints.maxWidth < 650) {
@@ -738,22 +769,29 @@ class _AttendanceTabState extends State<_AttendanceTab> {
           if (widget.store.activeRole != AppRole.student)
             Align(
               alignment: Alignment.centerRight,
-              child: FilledButton.icon(
+              child: FilledButton(
                 onPressed: values.isEmpty || !widget.store.canMarkLesson(lesson)
                     ? null
                     : () {
                         final changes = Map<String, AttendanceStatus>.of(
                           values,
                         );
+                        final changeTimes = Map<String, String?>.of(times);
                         runCrmAction(
                           context,
-                          () => widget.store.saveAttendance(lesson.id, changes),
+                          () => widget.store.saveAttendance(
+                            lesson.id,
+                            changes,
+                            times: changeTimes,
+                          ),
                           success: 'Davomat saqlandi',
                         );
-                        setState(() => values.clear());
+                        setState(() {
+                          values.clear();
+                          times.clear();
+                        });
                       },
-                icon: const Icon(Icons.save_outlined),
-                label: const Text('Saqlash'),
+                child: const Text('Saqlash'),
               ),
             ),
         ],

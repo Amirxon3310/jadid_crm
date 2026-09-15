@@ -1219,3 +1219,7 @@ begin
 end; $$;
 revoke all on function private.set_enrollment_status(bigint,text) from public,anon;
 grant execute on function private.set_enrollment_status(bigint,text) to authenticated;
+
+-- Attendance arrival time (2026-09-16): a teacher may optionally record
+-- what time a present/late student actually arrived, alongside status.
+alter table public.attendance add column arrived_at time;
