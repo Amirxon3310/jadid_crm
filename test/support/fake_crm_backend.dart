@@ -80,6 +80,7 @@ class FakeCrmBackend {
     'assignments': [],
     'attendance': [],
     'assignment_results': [],
+    'score_awards': [],
   };
   late final client = SupabaseClient(
     'https://example.test',

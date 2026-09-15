@@ -170,15 +170,25 @@ shu darsga bog‘lanadi; o‘quvchi javob yuboradi, ustoz tekshiradi va o‘tilg
 darslarni ko‘rishda davom etadi.
 
 **Qatnashdi** yoki **Kechikdi** deb belgilangan har bir dars uchun o‘quvchiga bir
-marta 10 coin beriladi (qayta saqlash coinlarni takrorlamaydi). Ushbu o‘zgarishlar
+marta 10 ball beriladi (qayta saqlash ballarni takrorlamaydi). Ushbu o‘zgarishlar
 `supabase/migrations/20260914175803_teacher_workspace.sql`,
 `supabase/migrations/20260914234429_group_creation_visibility.sql`,
 `supabase/migrations/20260915063000_enrollment_status_admin_only.sql`,
-`supabase/migrations/20260916070000_attendance_arrival_time.sql` va
-`supabase/migrations/20260916090000_lesson_window_and_homework_files.sql`
+`supabase/migrations/20260916070000_attendance_arrival_time.sql`,
+`supabase/migrations/20260916090000_lesson_window_and_homework_files.sql` va
+`supabase/migrations/20260916140000_score_awards.sql`
 orqali mavjud bazaga qo‘llanadi; yangi bazada `schema.sql` ichida allaqachon
 mavjud. `supabase/teacher_workspace_test.sql` begona guruhga yozish, selfisiz
-yoki boshqa kundagi davomat, va coin takrorlanishini tranzaksiyada tekshiradi.
+yoki boshqa kundagi davomat, va ball takrorlanishini tranzaksiyada tekshiradi.
+
+**Reyting** bo‘limida har bir o‘quvchining ballari to‘rt ustunda ajratilgan:
+dars ballari (davomat + qabul qilingan vazifa), qo‘shimcha **rag‘bat** (yashil,
+`+`), qo‘shimcha **jarima** (qizil, `−`) va **jami**. Ro‘yxat jami ball bo‘yicha
+tartiblanadi. O‘quvchi ustiga bosilsa, unga berilgan barcha qo‘shimcha ballar
+tarixi ochiladi: kim berdi, qancha va qanday izoh bilan. Admin va shu guruh
+ustozi o‘sha oynadan yangi rag‘bat yoki jarima qo‘shadi; o‘quvchi faqat o‘z
+tarixini ko‘radi. Cheklovlar `score_awards` jadvalining RLS qoidalarida ham
+takrorlangan, jami ball esa serverdagi hisobga ham kiradi.
 
 Uy vazifasi bitta “Vazifa” maydoni bilan beriladi (alohida “tushuntirish”
 maydoni yo‘q) va ixtiyoriy fayl biriktiriladi (`homework-files` yopiq
@@ -187,10 +197,11 @@ Muddat sukut bo‘yicha 1 haftadan keyin; ustoz xohlasa sanani o‘zgartiradi.
 
 ## O‘quvchi kabineti
 
-- Dashboarddagi coinlar — `accepted` holatidagi vazifalar baholari yig‘indisi
-  hamda **Qatnashdi**/**Kechikdi** deb belgilangan har bir dars uchun 10 coin.
-  Bir vazifani yoki davomatni qayta saqlash coinlarni takroran qo‘shmaydi.
-- Reyting jami coin bo‘yicha: yuqoriroq coin to‘plaganlar soni + 1. Teng coinlar
+- Dashboarddagi ballar — `accepted` holatidagi vazifalar baholari yig‘indisi,
+  **Qatnashdi**/**Kechikdi** deb belgilangan har bir dars uchun 10 ball, hamda
+  xodim qo‘shgan rag‘bat va jarima ballari. Bir vazifani yoki davomatni qayta
+  saqlash ballarni takroran qo‘shmaydi.
+- Reyting jami ball bo‘yicha: yuqoriroq ball to‘plaganlar soni + 1. Teng ballar
   bir xil o‘rinni oladi. Guruh reytingi tanlangan guruh a’zolari orasida hisoblanadi.
 - Kurs foizi — `completed` darslar / jami darslar. `cancelled` darslar hisobga
   kirmaydi. Dars bo‘lmasa foiz o‘rnida **—** chiqadi. Ustoz yoki admin guruhning

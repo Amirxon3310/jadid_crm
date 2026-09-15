@@ -36,25 +36,25 @@ class _StudentDashboardPageState extends State<StudentDashboardPage> {
     String rank(int? value) => value == null ? '—' : '$value-o‘rin';
     final cards = [
       (
-        '${store.coinsOf(store.activeUser.id)}',
-        'Jami coinlar',
+        '${store.pointsOf(store.activeUser.id)}',
+        'Jami ballar',
         Icons.monetization_on_outlined,
         AppColors.warning,
-        'Davomat uchun 10 coin va qabul qilingan vazifalar baholari',
+        'Davomat uchun 10 ball va qabul qilingan vazifalar baholari',
       ),
       (
         rank(selected == null ? null : store.rankFor(groupId: selected.id)),
         'Guruhdagi o‘rningiz',
         Icons.people_outline,
         AppColors.primary,
-        'Guruh ichida jami coin bo‘yicha; teng coin — teng o‘rin',
+        'Guruh ichida jami ball bo‘yicha; teng ball — teng o‘rin',
       ),
       (
         rank(store.rankFor()),
         'Markazdagi o‘rningiz',
         Icons.emoji_events_outlined,
         AppColors.success,
-        'Markazdagi jami coin bo‘yicha reyting',
+        'Markazdagi jami ball bo‘yicha reyting',
       ),
       (
         progress?.label ?? '—',

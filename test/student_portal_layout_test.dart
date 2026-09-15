@@ -84,7 +84,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     for (final text in [
-      'Jami coinlar',
+      'Jami ballar',
       'Guruhdagi o‘rningiz',
       'Markazdagi o‘rningiz',
       'Kursni tugatish',

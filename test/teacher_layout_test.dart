@@ -205,6 +205,68 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('rating splits points and opens a pupil’s award history', (
+    tester,
+  ) async {
+    final store = CrmStore()..changeRole(AppRole.admin);
+    addTearDown(store.dispose);
+    store.attendance.clear();
+    store.results.clear();
+    await store.saveAttendance(
+      store.lessons.firstWhere((l) => l.groupId == 'g1').id,
+      {'student-1': AttendanceStatus.present},
+    );
+    await store.addScoreAward(
+      studentId: 'student-1',
+      groupId: 'g1',
+      amount: 7,
+      note: 'Faol qatnashdi',
+    );
+    await store.addScoreAward(
+      studentId: 'student-1',
+      groupId: 'g1',
+      amount: -3,
+      note: 'Dafter olib kelmadi',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: GroupPage(store: store, group: store.groups.first, startTab: 4),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Lesson points, reward, penalty and total each get their own column.
+    for (final header in ['Dars ballari', 'Rag‘bat', 'Jarima', 'Jami']) {
+      expect(find.text(header), findsOneWidget);
+    }
+    expect(find.text('10'), findsOneWidget);
+    expect(find.text('+7'), findsOneWidget);
+    expect(find.text('-3'), findsOneWidget);
+    expect(find.text('14'), findsOneWidget);
+
+    // Tapping the pupil shows who gave what, and why.
+    await tester.tap(find.text('Ali Karimov'));
+    await tester.pumpAndSettle();
+    expect(find.text('Faol qatnashdi'), findsOneWidget);
+    expect(find.text('Dafter olib kelmadi'), findsOneWidget);
+    expect(find.textContaining(store.activeUser.name), findsWidgets);
+
+    // And a new award can be added right there.
+    await tester.enterText(find.widgetWithText(TextField, 'Ball'), '5');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Izoh'),
+      'Uyga vazifani a’lo bajardi',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Rag‘bat'));
+    await tester.pumpAndSettle();
+    expect(store.bonusPointsOf('student-1'), 12);
+    expect(find.text('Uyga vazifani a’lo bajardi'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('attendance stays shut for a teacher off the group schedule', (
     tester,
   ) async {

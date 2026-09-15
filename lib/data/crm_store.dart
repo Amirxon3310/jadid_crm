@@ -73,9 +73,10 @@ class CrmStore extends ChangeNotifier {
   bool get isOnline => client != null;
   AppRole activeRole = AppRole.teacher;
   final checkins = <LessonCheckin>[];
+  final scoreAwards = <ScoreAward>[];
   final checkinImages = <String, Uint8List>{};
-  final _coinTotals = <String, int>{};
-  final _coinBaseline = <String, int>{};
+  final _pointTotals = <String, int>{};
+  final _pointBaseline = <String, int>{};
 
   final users = <AppUser>[
     const AppUser(id: 'admin-1', name: 'Amirxon', role: AppRole.admin),
@@ -473,10 +474,8 @@ class CrmStore extends ChangeNotifier {
       );
       final arrivedAt = row['arrived_at'] as String?;
       if (arrivedAt != null) {
-        attendanceTimes.putIfAbsent(
-          lessonId,
-          () => {},
-        )[student.id] = arrivedAt.substring(0, 5);
+        attendanceTimes.putIfAbsent(lessonId, () => {})[student.id] = arrivedAt
+            .substring(0, 5);
       }
     }
 
@@ -1154,6 +1153,7 @@ class _CrmSnapshot {
           )
           .toList(),
       checkins = List.of(store.checkins),
+      scoreAwards = List.of(store.scoreAwards),
       checkinImages = Map.of(store.checkinImages),
       avatarUrls = Map.of(store.avatarUrls),
       avatarImages = Map.of(store.avatarImages);
@@ -1169,6 +1169,7 @@ class _CrmSnapshot {
   final Map<String, Map<String, String>> attendanceTimes;
   final List<HomeworkResult> results;
   final List<LessonCheckin> checkins;
+  final List<ScoreAward> scoreAwards;
   final Map<String, Uint8List> checkinImages;
   final Map<String, String> avatarUrls;
   final Map<String, Uint8List> avatarImages;
@@ -1176,6 +1177,9 @@ class _CrmSnapshot {
     store.checkins
       ..clear()
       ..addAll(checkins);
+    store.scoreAwards
+      ..clear()
+      ..addAll(scoreAwards);
     store.checkinImages
       ..clear()
       ..addAll(checkinImages);

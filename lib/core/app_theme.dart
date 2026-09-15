@@ -38,7 +38,10 @@ Future<void> loadSavedThemeMode() async {
 Future<void> setThemeMode(ThemeMode mode) async {
   appThemeMode.value = mode;
   final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_themeModeKey, mode == ThemeMode.dark ? 'dark' : 'light');
+  await prefs.setString(
+    _themeModeKey,
+    mode == ThemeMode.dark ? 'dark' : 'light',
+  );
 }
 
 ThemeData buildTheme({Brightness brightness = Brightness.light}) => ThemeData(

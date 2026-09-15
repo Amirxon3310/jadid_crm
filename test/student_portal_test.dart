@@ -8,7 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'support/fake_crm_backend.dart';
 
 void main() {
-  test('coins count accepted results once and equal totals share a rank', () {
+  test('points count accepted results once and equal totals share a rank', () {
     final store = CrmStore()..changeRole(AppRole.student);
     addTearDown(store.dispose);
     store.users.add(
@@ -37,7 +37,7 @@ void main() {
           score: 5,
         ),
       ]);
-    expect(store.coinsOf(store.activeUser.id), 5);
+    expect(store.pointsOf(store.activeUser.id), 5);
     expect(store.rankFor(), 1);
     store.results.add(
       HomeworkResult(
@@ -48,7 +48,7 @@ void main() {
       ),
     );
     expect(store.rankFor(), 2);
-    expect(store.coinsOf('peer'), 8);
+    expect(store.pointsOf('peer'), 8);
   });
   test(
     'course progress uses completed lessons and excludes cancelled lessons',

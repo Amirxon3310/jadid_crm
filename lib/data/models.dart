@@ -282,3 +282,26 @@ class LessonCheckin {
   final String lessonId, teacherId, photoPath;
   final DateTime checkedAt;
 }
+
+/// A bonus or penalty a staff member added on top of the points a pupil
+/// earns from attendance and homework. Positive is a reward, negative a fine.
+class ScoreAward {
+  const ScoreAward({
+    required this.id,
+    required this.studentId,
+    required this.amount,
+    required this.note,
+    required this.byName,
+    required this.createdAt,
+    this.groupId,
+  });
+
+  final String id;
+  final String studentId;
+  final String? groupId;
+  final int amount;
+  final String note;
+  final String byName;
+  final DateTime createdAt;
+  bool get isBonus => amount > 0;
+}

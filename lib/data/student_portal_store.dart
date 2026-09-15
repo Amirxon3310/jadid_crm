@@ -50,10 +50,10 @@ extension StudentPortalStore on CrmStore {
       activeRole == AppRole.admin ||
       (activeRole == AppRole.teacher &&
           groupById(groupId).teacherId == activeUser.id);
-  int coinsOf(String userId) =>
-      (_coinTotals[userId] ?? 0) +
-      localCoinsOf(userId) -
-      (_coinBaseline[userId] ?? 0);
+  int pointsOf(String userId) =>
+      (_pointTotals[userId] ?? 0) +
+      localPointsOf(userId) -
+      (_pointBaseline[userId] ?? 0);
   int? rankFor({String? groupId}) {
     if (isOnline && activeRole == AppRole.student) {
       final value = groupId == null
@@ -65,7 +65,8 @@ extension StudentPortalStore on CrmStore {
         ? users.where((u) => u.role == AppRole.student).map((u) => u.id).toSet()
         : studentsOf(groupId).map((s) => s.id).toSet();
     if (!peers.contains(activeUser.id)) return null;
-    return 1 + peers.where((id) => coinsOf(id) > coinsOf(activeUser.id)).length;
+    return 1 +
+        peers.where((id) => pointsOf(id) > pointsOf(activeUser.id)).length;
   }
 
   CourseProgress progressFor(String groupId) {

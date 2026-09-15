@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_theme.dart';
 import '../core/app_icon.dart';
+import '../core/app_notice.dart';
 import '../core/helpers.dart';
 import '../core/user_avatar.dart';
 import '../data/crm_store.dart';
@@ -1852,6 +1853,25 @@ List<Student> _visibleStudents(CrmStore store, String groupId) {
       .toList();
 }
 
+/// A signed points figure: green above zero, red below, muted at zero.
+class _SignedPoints extends StatelessWidget {
+  const _SignedPoints(this.value);
+  final int value;
+  @override
+  Widget build(BuildContext context) {
+    final color = value > 0
+        ? AppColors.success
+        : value < 0
+        ? AppColors.danger
+        : AppColors.muted;
+    final sign = value > 0 ? '+' : '';
+    return Text(
+      '$sign$value',
+      style: TextStyle(color: color, fontWeight: FontWeight.w600),
+    );
+  }
+}
+
 class _RankingTab extends StatelessWidget {
   const _RankingTab({required this.store, required this.group});
   final CrmStore store;
@@ -1859,7 +1879,7 @@ class _RankingTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final students = _visibleStudents(store, group.id)
-      ..sort((a, b) => store.coinsOf(b.id).compareTo(store.coinsOf(a.id)));
+      ..sort((a, b) => store.pointsOf(b.id).compareTo(store.pointsOf(a.id)));
     return Surface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1870,32 +1890,231 @@ class _RankingTab extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Davomat: 10 coin • Qabul qilingan vazifa: bahosi miqdorida coin',
+            'Davomat: 10 ball • Qabul qilingan vazifa: bahosi miqdorida ball • '
+            'ustiga bosib ball tarixini ko‘rish mumkin',
             style: TextStyle(color: AppColors.muted),
           ),
           const SizedBox(height: 16),
-          for (final student in students)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundColor: AppColors.softBlue(context),
-                child: Text(
-                  '${store.activeRole == AppRole.student ? store.rankFor(groupId: group.id) ?? '—' : 1 + students.where((s) => store.coinsOf(s.id) > store.coinsOf(student.id)).length}',
-                ),
-              ),
-              title: Text(student.name),
-              subtitle: Text(student.statusLabel),
-              trailing: Text(
-                '${store.coinsOf(student.id)} coin',
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
+          if (students.isEmpty)
+            const EmptyState(text: 'O‘quvchilar yo‘q')
+          else
+            LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: DataTable(
+                    columnSpacing: 20,
+                    showCheckboxColumn: false,
+                    columns: const [
+                      DataColumn(label: Text('#')),
+                      DataColumn(label: Text('O‘quvchi')),
+                      DataColumn(label: Text('Dars ballari'), numeric: true),
+                      DataColumn(label: Text('Rag‘bat'), numeric: true),
+                      DataColumn(label: Text('Jarima'), numeric: true),
+                      DataColumn(label: Text('Jami'), numeric: true),
+                    ],
+                    rows: [
+                      for (final (index, student) in students.indexed)
+                        DataRow(
+                          onSelectChanged: (_) =>
+                              _showAwardHistory(context, store, group, student),
+                          cells: [
+                            DataCell(Text('${index + 1}')),
+                            DataCell(
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  UserAvatar(
+                                    store: store,
+                                    user: store.users.firstWhere(
+                                      (u) => u.id == student.id,
+                                    ),
+                                    radius: 14,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(student.name),
+                                  if (student.status != 'active') ...[
+                                    const SizedBox(width: 8),
+                                    _StatusTag(
+                                      student.statusLabel,
+                                      student.status,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            DataCell(
+                              Text('${store.lessonPointsOf(student.id)}'),
+                            ),
+                            DataCell(
+                              _SignedPoints(store.bonusPointsOf(student.id)),
+                            ),
+                            DataCell(
+                              _SignedPoints(store.penaltyPointsOf(student.id)),
+                            ),
+                            DataCell(
+                              Text(
+                                '${store.pointsOf(student.id)}',
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          if (students.isEmpty) const EmptyState(text: 'O‘quvchilar yo‘q'),
         ],
       ),
     );
   }
+}
+
+/// Every reward and penalty a pupil has been given, newest first, with a
+/// form for the staff who may add another.
+Future<void> _showAwardHistory(
+  BuildContext context,
+  CrmStore store,
+  StudyGroup group,
+  Student student,
+) {
+  final amount = TextEditingController();
+  final note = TextEditingController();
+  return showFormDialog<void>(
+    context: context,
+    onDisposed: () {
+      amount.dispose();
+      note.dispose();
+    },
+    builder: (dialogContext) => AlertDialog(
+      title: Text(student.name),
+      content: SizedBox(
+        width: 460,
+        child: AnimatedBuilder(
+          animation: store,
+          builder: (context, _) {
+            final awards = store.awardsOf(student.id);
+            Future<void> submit(int sign) async {
+              final value = int.tryParse(amount.text.trim()) ?? 0;
+              if (value <= 0) {
+                showAppNotice(context, 'Musbat ball kiriting.', isError: true);
+                return;
+              }
+              await runCrmAction(
+                context,
+                () => store.addScoreAward(
+                  studentId: student.id,
+                  groupId: group.id,
+                  amount: sign * value,
+                  note: note.text.trim(),
+                ),
+                success: 'Ball saqlandi',
+              );
+              amount.clear();
+              note.clear();
+            }
+
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 6,
+                    children: [
+                      Text('Dars ballari: ${store.lessonPointsOf(student.id)}'),
+                      Text('Jami: ${store.pointsOf(student.id)}'),
+                    ],
+                  ),
+                  const Divider(height: 26),
+                  if (awards.isEmpty)
+                    const Text(
+                      'Hali qo‘shimcha ball berilmagan.',
+                      style: TextStyle(color: AppColors.muted),
+                    ),
+                  for (final award in awards)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: SizedBox(
+                        width: 52,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: _SignedPoints(award.amount),
+                        ),
+                      ),
+                      title: Text(award.note.isEmpty ? '—' : award.note),
+                      subtitle: Text(
+                        '${award.byName} • ${shortDate(award.createdAt)}',
+                      ),
+                    ),
+                  if (store.canManageGroup(group.id)) ...[
+                    const Divider(height: 26),
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 110,
+                          child: TextField(
+                            controller: amount,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Ball',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: note,
+                            decoration: const InputDecoration(
+                              labelText: 'Izoh',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: () => submit(1),
+                            icon: const Icon(Icons.add),
+                            label: const Text('Rag‘bat'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.danger,
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                            ),
+                            onPressed: () => submit(-1),
+                            icon: const Icon(Icons.remove),
+                            label: const Text('Jarima'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Yopish'),
+        ),
+      ],
+    ),
+  );
 }

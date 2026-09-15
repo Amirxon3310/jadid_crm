@@ -49,7 +49,7 @@ void main() {
   });
 
   test(
-    'attendance coins are unique per lesson and corrections reverse them',
+    'attendance points are unique per lesson and corrections reverse them',
     () async {
       final store = CrmStore()..changeRole(AppRole.admin);
       addTearDown(store.dispose);
@@ -59,11 +59,11 @@ void main() {
       await store.saveAttendance(lesson.id, {
         'student-1': AttendanceStatus.present,
       });
-      expect(store.coinsOf('student-1'), 10);
+      expect(store.pointsOf('student-1'), 10);
       await store.saveAttendance(lesson.id, {
         'student-1': AttendanceStatus.late,
       });
-      expect(store.coinsOf('student-1'), 10);
+      expect(store.pointsOf('student-1'), 10);
       store.results.add(
         HomeworkResult(
           homeworkId: 'h1',
@@ -72,16 +72,16 @@ void main() {
           score: 5,
         ),
       );
-      expect(store.coinsOf('student-1'), 15);
+      expect(store.pointsOf('student-1'), 15);
       await store.saveAttendance(lesson.id, {
         'student-1': AttendanceStatus.absent,
       });
-      expect(store.coinsOf('student-1'), 5);
+      expect(store.pointsOf('student-1'), 5);
       await store.saveAttendance(lesson.id, {
         'student-1': AttendanceStatus.present,
       });
       await store.setLessonStatus(lesson.id, 'cancelled');
-      expect(store.coinsOf('student-1'), 5);
+      expect(store.pointsOf('student-1'), 5);
     },
   );
 
@@ -146,10 +146,10 @@ void main() {
         final attendanceCheck = reject
             ? expectLater(attendance, throwsStateError)
             : attendance;
-        expect(store.coinsOf('student'), 10);
+        expect(store.pointsOf('student'), 10);
         backend.writeGate!.complete();
         await Future.wait([check, attendanceCheck]);
-        expect(store.coinsOf('student'), reject ? 0 : 10);
+        expect(store.pointsOf('student'), reject ? 0 : 10);
         expect(store.checkins.length, reject ? 0 : 1);
         expect(
           backend.calls
@@ -265,6 +265,66 @@ void main() {
     expect(
       store.isScheduledNow(otherDay, now: DateTime.utc(2026, 9, 16, 10, 30)),
       isFalse,
+    );
+  });
+
+  test('rewards and penalties sit beside lesson points in the total', () async {
+    final store = CrmStore()..changeRole(AppRole.admin);
+    addTearDown(store.dispose);
+    store.attendance.clear();
+    store.results.clear();
+    final lesson = store.lessons.firstWhere((l) => l.groupId == 'g1');
+    await store.saveAttendance(lesson.id, {
+      'student-1': AttendanceStatus.present,
+    });
+    expect(store.lessonPointsOf('student-1'), 10);
+    expect(store.pointsOf('student-1'), 10);
+
+    await store.addScoreAward(
+      studentId: 'student-1',
+      groupId: 'g1',
+      amount: 25,
+      note: 'Olimpiada g‘olibi',
+    );
+    await store.addScoreAward(
+      studentId: 'student-1',
+      groupId: 'g1',
+      amount: -5,
+      note: 'Kechikdi',
+    );
+
+    // Lesson points stay untouched; the two kinds of award are kept apart.
+    expect(store.lessonPointsOf('student-1'), 10);
+    expect(store.bonusPointsOf('student-1'), 25);
+    expect(store.penaltyPointsOf('student-1'), -5);
+    expect(store.pointsOf('student-1'), 30);
+
+    // The history reads newest first and carries who gave it and why.
+    final history = store.awardsOf('student-1');
+    expect(history.map((a) => a.amount), [-5, 25]);
+    expect(history.first.note, 'Kechikdi');
+    expect(history.first.byName, store.activeUser.name);
+    expect(history.every((a) => a.studentId == 'student-1'), isTrue);
+
+    // Zero is not an award, and a teacher may not touch another's group.
+    await expectLater(
+      store.addScoreAward(
+        studentId: 'student-1',
+        groupId: 'g1',
+        amount: 0,
+        note: '',
+      ),
+      throwsArgumentError,
+    );
+    store.changeRole(AppRole.teacher);
+    await expectLater(
+      store.addScoreAward(
+        studentId: 'student-8',
+        groupId: 'g3',
+        amount: 5,
+        note: '',
+      ),
+      throwsStateError,
     );
   });
 }

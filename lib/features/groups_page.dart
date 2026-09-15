@@ -113,7 +113,7 @@ class _GroupTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final attendance = store.groupAttendanceRate(group.id);
     final homework = store.groupHomeworkRate(group.id);
-    final coins = store.groupCoinTotal(group.id);
+    final points = store.groupPointTotal(group.id);
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(16),
@@ -130,9 +130,7 @@ class _GroupTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    group.active
-                        ? Icons.check_circle
-                        : Icons.cancel_outlined,
+                    group.active ? Icons.check_circle : Icons.cancel_outlined,
                     color: group.active ? AppColors.success : AppColors.danger,
                     size: 22,
                   ),
@@ -189,7 +187,7 @@ class _GroupTile extends StatelessWidget {
                   ),
                   _StatPill(
                     icon: Icons.emoji_events_outlined,
-                    label: '$coins coin',
+                    label: '$points ball',
                     color: AppColors.primary,
                   ),
                 ],

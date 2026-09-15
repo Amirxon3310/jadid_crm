@@ -32,6 +32,7 @@ extension TeacherStore on CrmStore {
       'assignments',
       'assignment_results',
       'lesson_checkins',
+      'score_awards',
     ]) {
       channel.onPostgresChanges(
         event: PostgresChangeEvent.all,
@@ -82,12 +83,12 @@ extension TeacherStore on CrmStore {
       avatarImages.addAll(images);
       checkinImages.addAll(selfies);
       _studentRanks = Map.of(fresh._studentRanks);
-      _coinTotals
+      _pointTotals
         ..clear()
-        ..addAll(fresh._coinTotals);
-      _coinBaseline
+        ..addAll(fresh._pointTotals);
+      _pointBaseline
         ..clear()
-        ..addAll(fresh._coinBaseline);
+        ..addAll(fresh._pointBaseline);
       _dashboardMetrics = fresh._dashboardMetrics;
       _profileFeaturesReady = fresh._profileFeaturesReady;
       notifyListeners();
@@ -103,8 +104,28 @@ extension TeacherStore on CrmStore {
 
   Future<void> _loadTeacherWorkspace() async {
     checkins.clear();
-    _coinTotals.clear();
-    _coinBaseline.clear();
+    _pointTotals.clear();
+    _pointBaseline.clear();
+    scoreAwards.clear();
+    // RLS narrows this to the pupil's own history, or to the groups a staff
+    // member manages.
+    final memberName = {for (final u in users) u.membershipId: u.name};
+    final memberUser = {for (final u in users) u.membershipId: u.id};
+    for (final row in await client!.from('score_awards').select()) {
+      final studentId = memberUser[row['student_membership_id'].toString()];
+      if (studentId == null) continue;
+      scoreAwards.add(
+        ScoreAward(
+          id: row['id'].toString(),
+          studentId: studentId,
+          groupId: row['group_id']?.toString(),
+          amount: (row['amount'] as num).toInt(),
+          note: row['note']?.toString() ?? '',
+          byName: memberName[row['created_by'].toString()] ?? 'Xodim',
+          createdAt: DateTime.parse(row['created_at'].toString()).toLocal(),
+        ),
+      );
+    }
     if (activeRole != AppRole.student) {
       final rows = await client!.from('lesson_checkins').select();
       for (final row in rows) {
@@ -135,20 +156,22 @@ extension TeacherStore on CrmStore {
       );
       for (final group in totals) {
         for (final row in group.entries) {
-          _coinTotals[row.key] = (row.value as num).toInt();
+          _pointTotals[row.key] = (row.value as num).toInt();
         }
       }
     } else {
-      _coinTotals[activeUser.id] =
+      _pointTotals[activeUser.id] =
           (_studentRanks['coins'] as num?)?.toInt() ??
-          localCoinsOf(activeUser.id);
+          localPointsOf(activeUser.id);
     }
-    for (final id in _coinTotals.keys) {
-      _coinBaseline[id] = localCoinsOf(id);
+    for (final id in _pointTotals.keys) {
+      _pointBaseline[id] = localPointsOf(id);
     }
   }
 
-  int localCoinsOf(String userId) {
+  /// Points a pupil earned from lessons alone: 10 per attended lesson plus
+  /// the score of every accepted homework.
+  int lessonPointsOf(String userId) {
     final homework = results
         .where(
           (r) => r.studentId == userId && r.status == HomeworkStatus.accepted,
@@ -165,6 +188,77 @@ extension TeacherStore on CrmStore {
         .toSet()
         .length;
     return homework + attended * 10;
+  }
+
+  List<ScoreAward> awardsOf(String userId) =>
+      scoreAwards.where((a) => a.studentId == userId).toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  /// Staff-added rewards, as a positive number.
+  int bonusPointsOf(String userId) => scoreAwards
+      .where((a) => a.studentId == userId && a.amount > 0)
+      .fold(0, (sum, a) => sum + a.amount);
+
+  /// Staff-added penalties, as a negative number.
+  int penaltyPointsOf(String userId) => scoreAwards
+      .where((a) => a.studentId == userId && a.amount < 0)
+      .fold(0, (sum, a) => sum + a.amount);
+
+  int localPointsOf(String userId) =>
+      lessonPointsOf(userId) + bonusPointsOf(userId) + penaltyPointsOf(userId);
+
+  /// Adds a reward (positive) or a penalty (negative) with its reason.
+  Future<void> addScoreAward({
+    required String studentId,
+    required String groupId,
+    required int amount,
+    required String note,
+  }) async {
+    if (!canManageGroup(groupId))
+      throw StateError('Ball berishga ruxsat yo‘q.');
+    if (amount == 0 || amount < -1000 || amount > 1000)
+      throw ArgumentError('Ball -1000 va 1000 oralig‘ida bo‘lsin.');
+    final student = studentById(studentId, groupId);
+    final actor = activeUser;
+    final temp = _newId();
+    await _mutate<Map<String, dynamic>>(
+      apply: () => scoreAwards.add(
+        ScoreAward(
+          id: temp,
+          studentId: studentId,
+          groupId: resolveId(groupId),
+          amount: amount,
+          note: note,
+          byName: actor.name,
+          createdAt: DateTime.now(),
+        ),
+      ),
+      send: () => client!
+          .from('score_awards')
+          .insert({
+            'organization_id': groupById(groupId).organizationId,
+            'student_membership_id': int.parse(student.membershipId),
+            'group_id': _serverId(groupId),
+            'amount': amount,
+            'note': note,
+            'created_by': int.parse(actor.membershipId),
+          })
+          .select()
+          .single(),
+      reconcile: (row) {
+        final index = scoreAwards.indexWhere((a) => a.id == temp);
+        scoreAwards[index] = ScoreAward(
+          id: row['id'].toString(),
+          studentId: studentId,
+          groupId: row['group_id']?.toString(),
+          amount: (row['amount'] as num).toInt(),
+          note: row['note']?.toString() ?? '',
+          byName: actor.name,
+          createdAt: DateTime.parse(row['created_at'].toString()).toLocal(),
+        );
+        _ids[temp] = row['id'].toString();
+      },
+    );
   }
 
   ({int groups, int students, int left, int graduates, double percent})
@@ -238,9 +332,9 @@ extension TeacherStore on CrmStore {
     return accepted * 100 / (homework.length * groupStudents.length);
   }
 
-  /// Group ranking value: the total coins its students have collected.
-  int groupCoinTotal(String groupId) =>
-      studentsOf(groupId).fold(0, (sum, student) => sum + coinsOf(student.id));
+  /// Group ranking value: the total points its students have collected.
+  int groupPointTotal(String groupId) =>
+      studentsOf(groupId).fold(0, (sum, student) => sum + pointsOf(student.id));
 
   void requireActiveGroup(String id) {
     if (!canManageGroup(id))
@@ -262,9 +356,7 @@ extension TeacherStore on CrmStore {
     'lesson_start_time': group.lessonStartTime.isEmpty
         ? null
         : group.lessonStartTime,
-    'lesson_end_time': group.lessonEndTime.isEmpty
-        ? null
-        : group.lessonEndTime,
+    'lesson_end_time': group.lessonEndTime.isEmpty ? null : group.lessonEndTime,
   };
 
   Future<void> updateGroup(StudyGroup group) async {
