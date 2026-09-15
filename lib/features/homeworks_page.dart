@@ -4,7 +4,7 @@ import '../core/app_theme.dart';
 import '../core/helpers.dart';
 import '../data/crm_store.dart';
 import '../data/models.dart';
-import 'group_page.dart';
+import 'homework_pages.dart';
 
 class HomeworksPage extends StatelessWidget {
   const HomeworksPage({super.key, required this.store});
@@ -99,7 +99,8 @@ class _HomeworkRow extends StatelessWidget {
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute<void>(
-          builder: (_) => GroupPage(store: store, group: group, startTab: 2),
+          builder: (_) =>
+              HomeworkDetailPage(store: store, homeworkId: homework.id),
         ),
       ),
     );

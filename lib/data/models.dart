@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 enum AppRole { admin, teacher, student }
 
 enum AttendanceStatus { present, late, absent }
@@ -231,6 +233,62 @@ class Lesson {
   );
 }
 
+/// A stored file: where it lives in the bucket and the name to show.
+class HomeworkFile {
+  const HomeworkFile({required this.path, required this.name});
+
+  factory HomeworkFile.fromJson(Map<String, dynamic> json) => HomeworkFile(
+    path: json['path'].toString(),
+    name: (json['name'] ?? 'fayl').toString(),
+  );
+
+  /// Reads the JSON list a row keeps, falling back to its older single
+  /// `file_path` column when the list is empty.
+  static List<HomeworkFile> listFrom(Map<String, dynamic> row, String key) {
+    final list = row[key];
+    if (list is List && list.isNotEmpty) {
+      return [
+        for (final item in list)
+          if (item is Map)
+            HomeworkFile.fromJson(Map<String, dynamic>.from(item)),
+      ];
+    }
+    final path = row['file_path'] as String?;
+    if (key == 'files' && path != null) {
+      return [
+        HomeworkFile(path: path, name: (row['file_name'] ?? 'fayl').toString()),
+      ];
+    }
+    return const [];
+  }
+
+  final String path;
+  final String name;
+
+  bool get isImage => RegExp(
+    r'\.(png|jpe?g|gif|webp|bmp)$',
+    caseSensitive: false,
+  ).hasMatch(name);
+
+  Map<String, String> toJson() => {'path': path, 'name': name};
+}
+
+/// A file picked on the device, not uploaded yet.
+class PickedFile {
+  const PickedFile(this.name, this.bytes);
+  final String name;
+  final Uint8List bytes;
+}
+
+/// A review of this score or more accepts the homework; below it returns it.
+const homeworkPassScore = 60;
+
+/// Ranking points one accepted homework is worth. Scores run 0–100 and a
+/// perfect one is worth 5 points — what the top mark was worth on the old
+/// 1–5 scale — so the new scale moves nobody's total. The server's
+/// coin_totals rounds the same way.
+int homeworkPointsFor(int? score) => ((score ?? 0) / 20).round();
+
 class Homework {
   Homework({
     required this.id,
@@ -239,19 +297,40 @@ class Homework {
     required this.description,
     required this.dueDate,
     this.lessonId,
-    this.filePath,
-    this.fileName,
+    this.createdAt,
+    this.files = const [],
   });
 
   final String id;
   final String groupId;
+
+  /// What to do — the one line the teacher writes.
   final String title;
-  // Attached reference file (task sheet, worksheet, etc.), optional.
-  final String? filePath;
-  final String? fileName;
   final String description;
   final DateTime dueDate;
   final String? lessonId;
+
+  /// When it was given; null for a homework still being saved.
+  final DateTime? createdAt;
+
+  /// Task sheets the teacher attached.
+  final List<HomeworkFile> files;
+
+  Homework copyWith({
+    String? title,
+    DateTime? dueDate,
+    DateTime? createdAt,
+    List<HomeworkFile>? files,
+  }) => Homework(
+    id: id,
+    groupId: groupId,
+    title: title ?? this.title,
+    description: description,
+    dueDate: dueDate ?? this.dueDate,
+    lessonId: lessonId,
+    createdAt: createdAt ?? this.createdAt,
+    files: files ?? this.files,
+  );
 }
 
 class HomeworkResult {
@@ -262,19 +341,35 @@ class HomeworkResult {
     this.status = HomeworkStatus.waiting,
     this.score,
     this.comment = '',
-    this.filePath,
-    this.fileName,
+    this.files = const [],
+    this.reviewFiles = const [],
+    this.submittedAt,
+    this.reviewedAt,
   });
 
   final String homeworkId;
   final String studentId;
+
+  /// The pupil's note to their answer.
   String answer;
   HomeworkStatus status;
+
+  /// 0–100 once reviewed.
   int? score;
+
+  /// The teacher's note to their review.
   String comment;
-  // File the pupil attached to the answer, optional.
-  String? filePath;
-  String? fileName;
+
+  /// Files the pupil sent.
+  List<HomeworkFile> files;
+
+  /// Files the teacher sent back with the review.
+  List<HomeworkFile> reviewFiles;
+  DateTime? submittedAt;
+  DateTime? reviewedAt;
+
+  /// Whether the pupil has handed anything in.
+  bool get hasAnswer => answer.isNotEmpty || files.isNotEmpty;
 }
 
 class LessonCheckin {

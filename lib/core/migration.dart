@@ -42,3 +42,15 @@ const memberRemovalMigration = MigrationMissing(
   asset:
       'supabase/migrations/20260917060000_member_removal_and_answer_files.sql',
 );
+
+/// 0–100 review scores, several files per homework, and deleting homework.
+const homeworkReviewMigration = MigrationMissing(
+  title: 'Uy vazifa uchun bir marta sozlash',
+  explanation:
+      'Uy vazifani 0–100 ball bilan tekshirish, bir nechta fayl biriktirish '
+      'va vazifani o‘chirish uchun bazada yangi ustunlar va ruxsatlar kerak, '
+      'ular hali qo‘llanmagan. Quyidagi SQL’ni nusxalab, Supabase → SQL '
+      'Editor’ga qo‘ying va bir marta “Run” bosing. Keyin shu sahifani '
+      'yangilang.',
+  asset: 'supabase/migrations/20260917120000_homework_review_and_files.sql',
+);

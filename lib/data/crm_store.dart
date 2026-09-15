@@ -462,18 +462,7 @@ class CrmStore extends ChangeNotifier {
     );
     homeworks
       ..clear()
-      ..addAll(
-        assignmentRows.map(
-          (row) => Homework(
-            id: row['id'].toString(),
-            groupId: row['group_id'].toString(),
-            title: row['title'].toString(),
-            description: row['description'].toString(),
-            dueDate: DateTime.parse(row['due_at'].toString()).toLocal(),
-            lessonId: row['lesson_id']?.toString(),
-          ),
-        ),
-      );
+      ..addAll(assignmentRows.map(_homeworkFrom));
 
     attendance.clear();
     attendanceTimes.clear();
@@ -509,12 +498,17 @@ class CrmStore extends ChangeNotifier {
           status: _homework(row['status'].toString()),
           score: row['score'] as int?,
           comment: row['comment'].toString(),
-          // Absent until the answer-file migration runs.
-          filePath: row['file_path'] as String?,
-          fileName: row['file_name'] as String?,
+          files: HomeworkFile.listFrom(row, 'files'),
+          reviewFiles: HomeworkFile.listFrom(row, 'review_files'),
+          submittedAt: _instant(row['submitted_at']),
+          reviewedAt: _instant(row['reviewed_at']),
         ),
       );
     }
+    _homeworkReviewReady = await _hasColumn(
+      'assignment_results',
+      'review_files',
+    );
     _dashboardMetrics = null;
     if (activeRole == AppRole.admin && _profileFeaturesReady) {
       _dashboardMetrics = DashboardMetrics.fromJson(
@@ -626,17 +620,12 @@ class CrmStore extends ChangeNotifier {
     String description,
     DateTime dueDate, {
     String? lessonId,
-    Uint8List? fileBytes,
-    String? fileName,
+    List<PickedFile> files = const [],
   }) async {
     final temp = _newId();
     final actor = activeUser;
-    // A string-based path is safe even if the group itself is still
-    // pending; it is recomputed with the resolved server id inside `send`.
-    var path = fileBytes == null
-        ? null
-        : '${groupById(groupId).organizationId}/${resolveId(groupId)}'
-              '/${DateTime.now().microsecondsSinceEpoch}_$fileName';
+    if (files.isNotEmpty && !homeworkReviewReady) throw homeworkReviewMigration;
+    final givenAt = DateTime.now();
     await _mutate<Map<String, dynamic>>(
       apply: () {
         final group = groupById(groupId);
@@ -657,62 +646,206 @@ class CrmStore extends ChangeNotifier {
             description: description,
             dueDate: dueDate,
             lessonId: lessonId == null ? null : resolveId(lessonId),
-            filePath: path,
-            fileName: fileName,
+            createdAt: givenAt,
+            files: _pendingFiles(files),
           ),
         );
       },
       send: () async {
-        if (path != null) {
-          path =
-              '${groupById(groupId).organizationId}/${_serverId(groupId)}'
-              '/${DateTime.now().microsecondsSinceEpoch}_$fileName';
-          await client!.storage
-              .from('homework-files')
-              .uploadBinary(path!, fileBytes!);
-        }
+        final uploaded = await _uploadHomeworkFiles(groupId, 'tasks', files);
         try {
-          return await client!
-              .from('assignments')
-              .insert({
-                'organization_id': groupById(groupId).organizationId,
-                'group_id': _serverId(groupId),
-                'title': title,
-                'description': description,
-                'due_at': dueDate.toUtc().toIso8601String(),
-                'lesson_id': lessonId == null ? null : _serverId(lessonId),
-                'created_by': int.parse(actor.membershipId),
-                'file_path': path,
-                'file_name': fileName,
-              })
-              .select()
-              .single();
+          return await _homeworkWrite(
+            () => client!
+                .from('assignments')
+                .insert({
+                  'organization_id': groupById(groupId).organizationId,
+                  'group_id': _serverId(groupId),
+                  'title': title,
+                  'description': description,
+                  'due_at': dueDate.toUtc().toIso8601String(),
+                  'lesson_id': lessonId == null ? null : _serverId(lessonId),
+                  'created_by': int.parse(actor.membershipId),
+                  // Only sent when there is something to send, so a plain
+                  // homework still saves before the files migration runs.
+                  if (uploaded.isNotEmpty)
+                    'files': [for (final file in uploaded) file.toJson()],
+                })
+                .select()
+                .single(),
+          );
         } catch (_) {
-          if (path != null) {
-            unawaited(
-              client!.storage
-                  .from('homework-files')
-                  .remove([path!])
-                  .then<void>((_) {}, onError: (Object _) {}),
-            );
-          }
+          _removeHomeworkFiles(uploaded);
           rethrow;
         }
       },
       reconcile: (row) {
-        homeworks[homeworks.indexWhere((h) => h.id == temp)] = Homework(
-          id: row['id'].toString(),
-          groupId: row['group_id'].toString(),
-          title: row['title'].toString(),
-          description: row['description'].toString(),
-          dueDate: DateTime.parse(row['due_at'].toString()).toLocal(),
-          lessonId: row['lesson_id']?.toString(),
-          filePath: row['file_path'] as String?,
-          fileName: row['file_name'] as String?,
-        );
+        final saved = _homeworkFrom(row);
+        homeworks[homeworks.indexWhere(
+          (h) => h.id == temp,
+        )] = saved.createdAt == null
+            ? saved.copyWith(createdAt: givenAt)
+            : saved;
         _ids[temp] = row['id'].toString();
       },
     );
+  }
+
+  /// Changes what a homework asks for and when it is due.
+  Future<void> updateHomework(
+    String homeworkId, {
+    required String title,
+    required DateTime dueDate,
+  }) async {
+    final text = title.trim();
+    if (text.isEmpty) throw ArgumentError('Vazifani yozing.');
+    final homework = homeworks.firstWhere((h) => h.id == resolveId(homeworkId));
+    if (!canManageGroup(homework.groupId))
+      throw StateError('Vazifani tahrirlashga ruxsat yo‘q.');
+    await _mutate<void>(
+      apply: () {
+        final index = homeworks.indexWhere(
+          (h) => h.id == resolveId(homeworkId),
+        );
+        if (index < 0) throw StateError('Vazifa topilmadi.');
+        homeworks[index] = homeworks[index].copyWith(
+          title: text,
+          dueDate: dueDate,
+        );
+      },
+      send: () async {
+        await client!
+            .from('assignments')
+            .update({
+              'title': text,
+              'due_at': dueDate.toUtc().toIso8601String(),
+            })
+            .eq('id', _serverId(homeworkId))
+            .select('id')
+            .single();
+      },
+    );
+  }
+
+  /// Deletes a homework together with every answer and review to it.
+  Future<void> deleteHomework(String homeworkId) async {
+    final homework = homeworks.firstWhere((h) => h.id == resolveId(homeworkId));
+    if (!canManageGroup(homework.groupId))
+      throw StateError('Vazifani o‘chirishga ruxsat yo‘q.');
+    if (!homeworkReviewReady) throw homeworkReviewMigration;
+    final attached = [
+      ...homework.files,
+      for (final result in results.where(
+        (r) => r.homeworkId == homework.id,
+      )) ...[...result.files, ...result.reviewFiles],
+    ];
+    await _mutate<void>(
+      apply: () {
+        homeworks.removeWhere((h) => h.id == resolveId(homeworkId));
+        results.removeWhere((r) => r.homeworkId == resolveId(homeworkId));
+      },
+      send: () async {
+        final removed = await client!
+            .from('assignments')
+            .delete()
+            .eq('id', _serverId(homeworkId))
+            .select('id');
+        // Row security hides a refused delete: nothing comes back and
+        // nothing is removed.
+        if (removed.isEmpty)
+          throw StateError('Vazifani o‘chirishga ruxsat yo‘q.');
+        _removeHomeworkFiles(attached);
+      },
+    );
+  }
+
+  Homework _homeworkFrom(Map<String, dynamic> row) => Homework(
+    id: row['id'].toString(),
+    groupId: row['group_id'].toString(),
+    title: row['title'].toString(),
+    description: (row['description'] ?? '').toString(),
+    dueDate: DateTime.parse(row['due_at'].toString()).toLocal(),
+    lessonId: row['lesson_id']?.toString(),
+    createdAt: _instant(row['created_at']),
+    files: HomeworkFile.listFrom(row, 'files'),
+  );
+
+  static DateTime? _instant(Object? value) =>
+      value == null ? null : DateTime.tryParse(value.toString())?.toLocal();
+
+  /// Names shown while the files are still uploading; no path yet.
+  static List<HomeworkFile> _pendingFiles(List<PickedFile> files) => [
+    for (final file in files) HomeworkFile(path: '', name: file.name),
+  ];
+
+  /// Uploads into `<org>/<group>/<folder>/`. A failure part-way removes what
+  /// did go up, so a half-sent answer leaves nothing behind.
+  Future<List<HomeworkFile>> _uploadHomeworkFiles(
+    String groupId,
+    String folder,
+    List<PickedFile> files,
+  ) async {
+    final uploaded = <HomeworkFile>[];
+    if (files.isEmpty) return uploaded;
+    final base =
+        '${groupById(groupId).organizationId}/${_serverId(groupId)}/$folder';
+    try {
+      for (final (index, file) in files.indexed) {
+        // Storage keys refuse spaces and most non-Latin letters.
+        final safe = file.name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+        final path =
+            '$base/${DateTime.now().microsecondsSinceEpoch}_${index}_$safe';
+        await client!.storage
+            .from('homework-files')
+            .uploadBinary(path, file.bytes);
+        uploaded.add(HomeworkFile(path: path, name: file.name));
+      }
+    } catch (_) {
+      _removeHomeworkFiles(uploaded);
+      rethrow;
+    }
+    return uploaded;
+  }
+
+  void _removeHomeworkFiles(List<HomeworkFile> files) {
+    final paths = [
+      for (final file in files)
+        if (file.path.isNotEmpty) file.path,
+    ];
+    if (paths.isEmpty || !isOnline) return;
+    unawaited(
+      client!.storage
+          .from('homework-files')
+          .remove(paths)
+          .then<void>((_) {}, onError: (Object _) {}),
+    );
+  }
+
+  /// Whether [column] exists. Selecting a column a table lacks is the one
+  /// unambiguous sign of a migration not applied: PostgREST answers 42703.
+  Future<bool> _hasColumn(String table, String column) async {
+    try {
+      await client!.from(table).select(column).limit(1);
+      return true;
+    } on PostgrestException catch (error) {
+      return error.code != '42703' && error.code != 'PGRST204';
+    }
+  }
+
+  /// A safety net behind [homeworkReviewReady], for a database changed after
+  /// it loaded: the errors only a missing migration gives become the notice
+  /// that hands over its SQL. A permission refusal (42501) is left alone —
+  /// it means the same whether or not the migration ran.
+  static Future<T> _homeworkWrite<T>(Future<T> Function() write) async {
+    try {
+      return await write();
+    } on PostgrestException catch (error) {
+      // PGRST204 / 42703: no such column. 23514: the old 1–5 score check —
+      // scores are held to 0–100 before sending, so nothing else trips it.
+      if (const {'PGRST204', '42703', '23514'}.contains(error.code)) {
+        throw homeworkReviewMigration;
+      }
+      rethrow;
+    }
   }
 
   Future<String> homeworkFileUrl(String path) async =>
@@ -722,24 +855,23 @@ class CrmStore extends ChangeNotifier {
     String homeworkId,
     String studentId,
     String answer, {
-    Uint8List? fileBytes,
-    String? fileName,
+    List<PickedFile> files = const [],
   }) async {
     final homework = homeworks.firstWhere((h) => h.id == resolveId(homeworkId));
     if (!studentById(studentId, homework.groupId).active ||
         !groupById(homework.groupId).active)
       throw StateError('Bu guruhdagi o‘qish tugagan.');
-    if (resultFor(homeworkId, studentId).status == HomeworkStatus.accepted) {
+    final current = resultFor(homeworkId, studentId);
+    if (current.status == HomeworkStatus.accepted) {
       throw StateError('Qabul qilingan javobni o‘zgartirib bo‘lmaydi.');
     }
-    // The answer file sits beside the task sheet, under an `answers` folder
-    // so a group's own uploads stay apart from the teacher's.
-    var path = fileBytes == null
-        ? null
-        : '${groupById(homework.groupId).organizationId}'
-              '/${resolveId(homework.groupId)}/answers'
-              '/${DateTime.now().microsecondsSinceEpoch}_$fileName';
-    await _mutate<void>(
+    if (answer.trim().isEmpty && files.isEmpty && current.files.isEmpty)
+      throw ArgumentError('Izoh yozing yoki fayl biriktiring.');
+    if (files.isNotEmpty && !homeworkReviewReady) throw homeworkReviewMigration;
+    // A resubmission clears the old review, its files included.
+    final clearReviewFiles = current.reviewFiles.isNotEmpty;
+    final sentAt = DateTime.now();
+    await _mutate<List<HomeworkFile>>(
       apply: () {
         if (!homeworks.any((h) => h.id == resolveId(homeworkId)))
           throw StateError('Vazifa saqlanmadi.');
@@ -747,82 +879,125 @@ class CrmStore extends ChangeNotifier {
           ..answer = answer
           ..status = HomeworkStatus.submitted
           ..score = null
-          ..comment = '';
-        if (fileBytes != null) {
-          result
-            ..filePath = path
-            ..fileName = fileName;
-        }
+          ..comment = ''
+          ..reviewFiles = const []
+          ..submittedAt = sentAt
+          ..reviewedAt = null;
+        if (files.isNotEmpty) result.files = _pendingFiles(files);
       },
       send: () async {
-        if (path != null) {
-          path =
-              '${groupById(homework.groupId).organizationId}'
-              '/${_serverId(homework.groupId)}/answers'
-              '/${DateTime.now().microsecondsSinceEpoch}_$fileName';
-          await client!.storage
-              .from('homework-files')
-              .uploadBinary(path!, fileBytes!);
+        final uploaded = await _uploadHomeworkFiles(
+          homework.groupId,
+          'answers',
+          files,
+        );
+        try {
+          await _homeworkWrite(
+            () => client!.from('assignment_results').upsert({
+              'organization_id': groupById(homework.groupId).organizationId,
+              'assignment_id': _serverId(homeworkId),
+              'enrollment_id': _serverId(
+                studentById(studentId, homework.groupId).enrollmentId,
+              ),
+              'answer': answer,
+              'status': 'submitted',
+              'score': null,
+              'reviewed_by': null,
+              'reviewed_at': null,
+              'comment': '',
+              'submitted_at': sentAt.toUtc().toIso8601String(),
+              if (uploaded.isNotEmpty)
+                'files': [for (final file in uploaded) file.toJson()],
+              if (clearReviewFiles) 'review_files': <Object>[],
+            }, onConflict: 'assignment_id,enrollment_id'),
+          );
+        } catch (_) {
+          _removeHomeworkFiles(uploaded);
+          rethrow;
         }
-        await client!.from('assignment_results').upsert({
-          'organization_id': groupById(homework.groupId).organizationId,
-          'assignment_id': _serverId(homeworkId),
-          'enrollment_id': _serverId(
-            studentById(studentId, homework.groupId).enrollmentId,
-          ),
-          'answer': answer,
-          'status': 'submitted',
-          'score': null,
-          'reviewed_by': null,
-          'reviewed_at': null,
-          'comment': '',
-          'submitted_at': DateTime.now().toUtc().toIso8601String(),
-          if (path != null) ...{'file_path': path, 'file_name': fileName},
-        }, onConflict: 'assignment_id,enrollment_id');
+        return uploaded;
+      },
+      reconcile: (uploaded) {
+        if (uploaded.isNotEmpty) {
+          resultFor(homeworkId, studentId).files = uploaded;
+        }
       },
     );
   }
 
+  /// Marks an answer from 0 to 100. The score decides the outcome:
+  /// [homeworkPassScore] or more accepts it, anything less returns it.
   Future<void> reviewHomework({
     required String homeworkId,
     required String studentId,
-    required bool accepted,
     required int score,
     required String comment,
+    List<PickedFile> files = const [],
   }) async {
-    if (score < 1 || score > 5)
-      throw ArgumentError('Baho 1–5 oralig‘ida bo‘lishi kerak.');
+    if (score < 0 || score > 100)
+      throw ArgumentError('Ball 0–100 oralig‘ida bo‘lishi kerak.');
     final homework = homeworks.firstWhere((h) => h.id == resolveId(homeworkId));
+    // The old 1–5 rule would refuse the score, or store it unreadable.
+    if (!homeworkReviewReady) throw homeworkReviewMigration;
     studentById(studentId, homework.groupId);
     resultFor(homeworkId, studentId);
     final actor = activeUser;
-    final status = accepted ? HomeworkStatus.accepted : HomeworkStatus.returned;
-    await _mutate<void>(
+    final status = score >= homeworkPassScore
+        ? HomeworkStatus.accepted
+        : HomeworkStatus.returned;
+    final reviewedAt = DateTime.now();
+    await _mutate<List<HomeworkFile>>(
       apply: () {
         if (!homeworks.any((h) => h.id == resolveId(homeworkId)))
           throw StateError('Vazifa saqlanmadi.');
-        resultFor(homeworkId, studentId)
+        final result = resultFor(homeworkId, studentId)
           ..status = status
           ..score = score
-          ..comment = comment;
+          ..comment = comment
+          ..reviewedAt = reviewedAt;
+        if (files.isNotEmpty) result.reviewFiles = _pendingFiles(files);
       },
       send: () async {
-        await client!
-            .from('assignment_results')
-            .update({
-              'status': status.name,
-              'score': score,
-              'comment': comment,
-              'reviewed_by': int.parse(actor.membershipId),
-              'reviewed_at': DateTime.now().toUtc().toIso8601String(),
-            })
-            .eq('assignment_id', _serverId(homeworkId))
-            .eq(
-              'enrollment_id',
-              _serverId(studentById(studentId, homework.groupId).enrollmentId),
-            )
-            .select('id')
-            .single();
+        final uploaded = await _uploadHomeworkFiles(
+          homework.groupId,
+          'reviews',
+          files,
+        );
+        try {
+          await _homeworkWrite(
+            () => client!
+                .from('assignment_results')
+                .update({
+                  'status': status.name,
+                  'score': score,
+                  'comment': comment,
+                  'reviewed_by': int.parse(actor.membershipId),
+                  'reviewed_at': reviewedAt.toUtc().toIso8601String(),
+                  if (uploaded.isNotEmpty)
+                    'review_files': [
+                      for (final file in uploaded) file.toJson(),
+                    ],
+                })
+                .eq('assignment_id', _serverId(homeworkId))
+                .eq(
+                  'enrollment_id',
+                  _serverId(
+                    studentById(studentId, homework.groupId).enrollmentId,
+                  ),
+                )
+                .select('id')
+                .single(),
+          );
+        } catch (_) {
+          _removeHomeworkFiles(uploaded);
+          rethrow;
+        }
+        return uploaded;
+      },
+      reconcile: (uploaded) {
+        if (uploaded.isNotEmpty) {
+          resultFor(homeworkId, studentId).reviewFiles = uploaded;
+        }
       },
     );
   }
@@ -1061,6 +1236,12 @@ class CrmStore extends ChangeNotifier {
   /// penalties are then unavailable, but everything else keeps working.
   bool get scoreAwardsReady => !isOnline || _scoreAwardsReady;
   bool _scoreAwardsReady = false;
+
+  /// False once a load finds the database predates the homework review
+  /// migration (0–100 scores, several files, deleting homework). Starts true:
+  /// only a load can prove it missing.
+  bool get homeworkReviewReady => !isOnline || _homeworkReviewReady;
+  bool _homeworkReviewReady = true;
   final branches = <String>[];
   final payments = <PaymentRecord>[];
   Map<String, dynamic> _studentRanks = {};
@@ -1255,6 +1436,10 @@ class _CrmSnapshot {
               status: r.status,
               score: r.score,
               comment: r.comment,
+              files: r.files,
+              reviewFiles: r.reviewFiles,
+              submittedAt: r.submittedAt,
+              reviewedAt: r.reviewedAt,
             ),
           )
           .toList(),
@@ -1339,7 +1524,11 @@ class _CrmSnapshot {
             ..answer = saved.answer
             ..status = saved.status
             ..score = saved.score
-            ..comment = saved.comment;
+            ..comment = saved.comment
+            ..files = saved.files
+            ..reviewFiles = saved.reviewFiles
+            ..submittedAt = saved.submittedAt
+            ..reviewedAt = saved.reviewedAt;
         }),
       );
     store.avatarUrls

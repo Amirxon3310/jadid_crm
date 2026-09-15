@@ -14,6 +14,13 @@ class FakeCrmBackend {
   /// What Auth answers instead of a session, verbatim as Supabase words it.
   String? authError;
 
+  /// Columns, per table, a database predating their migration would not
+  /// have yet. Selecting one by name fails the way PostgREST does.
+  final missingColumns = <String, Set<String>>{};
+
+  /// Tables whose delete policy a database predating it would not have.
+  final deleteBlocked = <String>{};
+
   /// Functions a database predating their migration would not have yet.
   final missingFunctions = <String>{};
 
@@ -159,6 +166,14 @@ class FakeCrmBackend {
     if (request.method == 'GET') {
       await readGate?.future;
       final table = path.split('/').last;
+      final select = request.url.queryParameters['select'] ?? '*';
+      for (final column in missingColumns[table] ?? const <String>{}) {
+        if (select.split(',').contains(column))
+          return json({
+            'code': '42703',
+            'message': 'column $table.$column does not exist',
+          }, status: 400);
+      }
       if (missingTables.contains(table))
         return json({
           'code': 'PGRST205',
@@ -175,6 +190,23 @@ class FakeCrmBackend {
       return json(
         request.method == 'DELETE' ? [] : {'Key': path.split('/object/').last},
       );
+    }
+    if (request.method == 'DELETE') {
+      final table = path.split('/').last;
+      // A table without a delete policy: row security returns nothing.
+      if (deleteBlocked.contains(table)) return json(<Object>[]);
+      final filters = {
+        for (final entry in request.url.queryParameters.entries)
+          if (entry.value.startsWith('eq.'))
+            entry.key: entry.value.substring(3),
+      };
+      final removed = tables[table]!
+          .where(
+            (row) => filters.entries.every((f) => '${row[f.key]}' == f.value),
+          )
+          .toList();
+      tables[table]!.removeWhere(removed.contains);
+      return json(removed);
     }
     final decoded = jsonDecode(request.body);
     if (decoded is List) {

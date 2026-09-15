@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'app_notice.dart';
 import '../data/optimistic_queue.dart';
+import 'migration.dart';
+import 'migration_setup.dart';
 
 String shortDate(DateTime date) {
   final day = date.day.toString().padLeft(2, '0');
@@ -27,9 +29,13 @@ Future<void> runCrmAction(
     }
   } catch (error) {
     if (error is MutationCancelled) return;
-    if (context.mounted) {
-      showAppNotice(context, crmActionError(error), isError: true);
+    if (!context.mounted) return;
+    // A feature waiting on a migration hands over the SQL to apply it.
+    if (error is MigrationMissing) {
+      await showMigrationSetup(context, error);
+      return;
     }
+    showAppNotice(context, crmActionError(error), isError: true);
   }
 }
 

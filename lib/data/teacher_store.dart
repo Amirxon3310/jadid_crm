@@ -92,6 +92,7 @@ extension TeacherStore on CrmStore {
       _dashboardMetrics = fresh._dashboardMetrics;
       _profileFeaturesReady = fresh._profileFeaturesReady;
       _scoreAwardsReady = fresh._scoreAwardsReady;
+      _homeworkReviewReady = fresh._homeworkReviewReady;
       notifyListeners();
       return true;
     } catch (_) {
@@ -180,12 +181,13 @@ extension TeacherStore on CrmStore {
     }
   }
 
-  /// The score of every homework the pupil got accepted.
+  /// Points from every homework the pupil got accepted, on the ranking's
+  /// scale rather than the 0–100 review score (see [homeworkPointsFor]).
   int homeworkPointsOf(String userId) => results
       .where(
         (r) => r.studentId == userId && r.status == HomeworkStatus.accepted,
       )
-      .fold(0, (sum, r) => sum + (r.score ?? 0));
+      .fold(0, (sum, r) => sum + homeworkPointsFor(r.score));
 
   /// 10 points per lesson the pupil turned up for, late still counting.
   int attendancePointsOf(String userId) =>

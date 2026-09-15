@@ -32,12 +32,11 @@ void main() {
     await store.reviewHomework(
       homeworkId: 'h1',
       studentId: 'student-1',
-      accepted: true,
-      score: 5,
+      score: 100,
       comment: 'Yaxshi',
     );
     expect(store.resultFor('h1', 'student-1').status, HomeworkStatus.accepted);
-    expect(store.resultFor('h1', 'student-1').score, 5);
+    expect(store.resultFor('h1', 'student-1').score, 100);
   });
 
   test('qaytarilgan vazifa qayta yuborilganda eski baho tozalanadi', () async {
@@ -45,8 +44,7 @@ void main() {
     await store.reviewHomework(
       homeworkId: 'h1',
       studentId: 'student-1',
-      accepted: false,
-      score: 2,
+      score: 40,
       comment: 'Qayta bajaring',
     );
     await store.submitHomework('h1', 'student-1', 'Yangi javob');
@@ -87,8 +85,7 @@ void main() {
     await store.reviewHomework(
       homeworkId: 'h1',
       studentId: 'student-1',
-      accepted: true,
-      score: 5,
+      score: 100,
       comment: 'Yaxshi',
     );
     await expectLater(

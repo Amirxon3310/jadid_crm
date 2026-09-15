@@ -89,13 +89,13 @@ void main() {
           expect(switcher.onChanged, isNull);
         }
         if (label == 'Uy vazifalari') {
-          await tester.tap(find.text('Vazifa berish'));
+          await tester.tap(find.text('Uy vazifa qo‘shish'));
           await tester.pumpAndSettle();
           await tester.enterText(
-            find.widgetWithText(TextField, 'Vazifa (nima qilish kerak)'),
+            find.widgetWithText(TextField, 'Izoh (nima qilish kerak)'),
             'New linked task',
           );
-          await tester.tap(find.text('Berish'));
+          await tester.tap(find.widgetWithText(FilledButton, 'Qo‘shish'));
           await tester.pumpAndSettle();
           expect(store.homeworks.last.lessonId, isNotNull);
           expect(tester.takeException(), isNull);

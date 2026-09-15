@@ -136,8 +136,7 @@ void main() {
       await store.reviewHomework(
         homeworkId: '4',
         studentId: 'student',
-        accepted: false,
-        score: 2,
+        score: 40,
         comment: 'Retry',
       );
       expect(writes.last.url.queryParameters['enrollment_id'], 'eq.20');
@@ -168,8 +167,7 @@ void main() {
       store.reviewHomework(
         homeworkId: '4',
         studentId: 'student',
-        accepted: true,
-        score: 5,
+        score: 100,
         comment: 'OK',
       ),
       throwsA(isA<PostgrestException>()),

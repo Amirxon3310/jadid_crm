@@ -26,6 +26,7 @@ flutter:
     # migration itself rather than a copy that can drift from it.
     - supabase/migrations/20260916140000_score_awards.sql
     - supabase/migrations/20260917060000_member_removal_and_answer_files.sql
+    - supabase/migrations/20260917120000_homework_review_and_files.sql
   fonts:
     - family: SF Pro Display
       fonts:

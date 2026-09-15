@@ -72,7 +72,7 @@ void main() {
           homeworkId: 'h1',
           studentId: 'student-1',
           status: HomeworkStatus.accepted,
-          score: 5,
+          score: 100,
         ),
       );
       expect(store.pointsOf('student-1'), 15);
@@ -566,7 +566,7 @@ void main() {
           homeworkId: 'h1',
           studentId: pupil.id,
           status: HomeworkStatus.accepted,
-          score: 4,
+          score: 80,
         ),
       );
 

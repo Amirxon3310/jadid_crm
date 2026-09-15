@@ -22,19 +22,19 @@ void main() {
           homeworkId: 'a',
           studentId: store.activeUser.id,
           status: HomeworkStatus.accepted,
-          score: 5,
+          score: 100,
         ),
         HomeworkResult(
           homeworkId: 'b',
           studentId: store.activeUser.id,
           status: HomeworkStatus.returned,
-          score: 4,
+          score: 80,
         ),
         HomeworkResult(
           homeworkId: 'a',
           studentId: 'peer',
           status: HomeworkStatus.accepted,
-          score: 5,
+          score: 100,
         ),
       ]);
     expect(store.pointsOf(store.activeUser.id), 5);
@@ -44,7 +44,7 @@ void main() {
         homeworkId: 'c',
         studentId: 'peer',
         status: HomeworkStatus.accepted,
-        score: 3,
+        score: 60,
       ),
     );
     expect(store.rankFor(), 2);
