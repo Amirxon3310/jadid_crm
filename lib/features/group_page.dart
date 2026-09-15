@@ -1853,47 +1853,193 @@ List<Student> _visibleStudents(CrmStore store, String groupId) {
       .toList();
 }
 
-/// A signed points figure: green above zero, red below, muted at zero.
+/// A signed points figure as a badge: bright green above zero, bright red
+/// below, and a plain dash at zero so the board reads at a glance.
 class _SignedPoints extends StatelessWidget {
   const _SignedPoints(this.value);
   final int value;
   @override
   Widget build(BuildContext context) {
-    final color = value > 0
-        ? AppColors.success
-        : value < 0
-        ? AppColors.danger
-        : AppColors.muted;
-    final sign = value > 0 ? '+' : '';
-    return Text(
-      '$sign$value',
-      style: TextStyle(color: color, fontWeight: FontWeight.w600),
+    if (value == 0) {
+      return const Text('—', style: TextStyle(color: AppColors.muted));
+    }
+    final reward = value > 0;
+    final color = reward ? AppColors.rewardGreen : AppColors.penaltyRed;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: .45)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            reward ? Icons.star_rounded : Icons.bolt_rounded,
+            size: 14,
+            color: color,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            '${reward ? '+' : ''}$value',
+            style: TextStyle(color: color, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _RankingTab extends StatelessWidget {
+/// The first three places wear a crown; everyone else just gets a number.
+class _RankBadge extends StatelessWidget {
+  const _RankBadge(this.rank);
+  final int rank;
+  @override
+  Widget build(BuildContext context) {
+    if (rank > 3) {
+      return Text(
+        '$rank',
+        style: const TextStyle(
+          color: AppColors.muted,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+    }
+    final color = switch (rank) {
+      1 => AppColors.gold,
+      2 => AppColors.silver,
+      _ => AppColors.bronze,
+    };
+    return Tooltip(
+      message: '$rank-o‘rin',
+      child: Container(
+        width: 34,
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .18),
+          shape: BoxShape.circle,
+          border: Border.all(color: color, width: 2),
+        ),
+        child: const Text('👑', style: TextStyle(fontSize: 15)),
+      ),
+    );
+  }
+}
+
+/// The running total, as the board's headline figure.
+class _TotalPoints extends StatelessWidget {
+  const _TotalPoints(this.value, {this.highlight = false});
+  final int value;
+  final bool highlight;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    decoration: BoxDecoration(
+      color: (highlight ? AppColors.gold : AppColors.primary).withValues(
+        alpha: .14,
+      ),
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(
+      '$value ball',
+      style: TextStyle(
+        color: highlight ? const Color(0xFFB07800) : AppColors.primary,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  );
+}
+
+class _RankingTab extends StatefulWidget {
   const _RankingTab({required this.store, required this.group});
   final CrmStore store;
   final StudyGroup group;
   @override
+  State<_RankingTab> createState() => _RankingTabState();
+}
+
+class _RankingTabState extends State<_RankingTab> {
+  // Purely a what-if: the picked pupils are never stored anywhere, the team
+  // only lives as long as this tab is open.
+  bool teamMode = false;
+  final team = <String>{};
+
+  @override
   Widget build(BuildContext context) {
+    final store = widget.store, group = widget.group;
     final students = _visibleStudents(store, group.id)
       ..sort((a, b) => store.pointsOf(b.id).compareTo(store.pointsOf(a.id)));
+    team.retainWhere((id) => students.any((s) => s.id == id));
+
     return Surface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'O‘quvchilar reytingi',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const title = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '🏆 O‘quvchilar reytingi',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    'Davomat: 10 ball • Qabul qilingan vazifa: bahosi miqdorida '
+                    'ball • ustiga bosib ball tarixini ko‘rish mumkin',
+                    style: TextStyle(color: AppColors.muted),
+                  ),
+                ],
+              );
+              final toggle = students.length < 2
+                  ? const SizedBox.shrink()
+                  : FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: teamMode
+                            ? AppColors.muted
+                            : AppColors.rewardGreen,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                      ),
+                      onPressed: () => setState(() {
+                        teamMode = !teamMode;
+                        team.clear();
+                      }),
+                      icon: Icon(
+                        teamMode ? Icons.close_rounded : Icons.groups_2_rounded,
+                        size: 20,
+                      ),
+                      label: Text(teamMode ? 'Yopish' : 'Jamoa tuzish'),
+                    );
+              if (constraints.maxWidth < 620) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [title, const SizedBox(height: 12), toggle],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: title),
+                  toggle,
+                ],
+              );
+            },
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Davomat: 10 ball • Qabul qilingan vazifa: bahosi miqdorida ball • '
-            'ustiga bosib ball tarixini ko‘rish mumkin',
-            style: TextStyle(color: AppColors.muted),
-          ),
+          if (teamMode) ...[
+            const SizedBox(height: 16),
+            _TeamCard(
+              store: store,
+              students: students,
+              team: team,
+              onClear: () => setState(team.clear),
+            ),
+          ],
           const SizedBox(height: 16),
           if (students.isEmpty)
             const EmptyState(text: 'O‘quvchilar yo‘q')
@@ -1905,7 +2051,7 @@ class _RankingTab extends StatelessWidget {
                   constraints: BoxConstraints(minWidth: constraints.maxWidth),
                   child: DataTable(
                     columnSpacing: 20,
-                    showCheckboxColumn: false,
+                    showCheckboxColumn: teamMode,
                     columns: const [
                       DataColumn(label: Text('#')),
                       DataColumn(label: Text('O‘quvchi')),
@@ -1917,10 +2063,23 @@ class _RankingTab extends StatelessWidget {
                     rows: [
                       for (final (index, student) in students.indexed)
                         DataRow(
-                          onSelectChanged: (_) =>
-                              _showAwardHistory(context, store, group, student),
+                          selected: teamMode && team.contains(student.id),
+                          // In team mode a tap picks the pupil for the
+                          // what-if; otherwise it opens their history.
+                          onSelectChanged: (_) => teamMode
+                              ? setState(
+                                  () => team.contains(student.id)
+                                      ? team.remove(student.id)
+                                      : team.add(student.id),
+                                )
+                              : _showAwardHistory(
+                                  context,
+                                  store,
+                                  group,
+                                  student,
+                                ),
                           cells: [
-                            DataCell(Text('${index + 1}')),
+                            DataCell(_RankBadge(index + 1)),
                             DataCell(
                               Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -1933,7 +2092,14 @@ class _RankingTab extends StatelessWidget {
                                     radius: 14,
                                   ),
                                   const SizedBox(width: 8),
-                                  Text(student.name),
+                                  Text(
+                                    student.name,
+                                    style: TextStyle(
+                                      fontWeight: index < 3
+                                          ? FontWeight.w700
+                                          : FontWeight.w400,
+                                    ),
+                                  ),
                                   if (student.status != 'active') ...[
                                     const SizedBox(width: 8),
                                     _StatusTag(
@@ -1954,12 +2120,9 @@ class _RankingTab extends StatelessWidget {
                               _SignedPoints(store.penaltyPointsOf(student.id)),
                             ),
                             DataCell(
-                              Text(
-                                '${store.pointsOf(student.id)}',
-                                style: const TextStyle(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                              _TotalPoints(
+                                store.pointsOf(student.id),
+                                highlight: index == 0,
                               ),
                             ),
                           ],
@@ -1973,6 +2136,160 @@ class _RankingTab extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The what-if panel: pick pupils and see what one team of them would score
+/// and where that would place against everyone left on the board.
+class _TeamCard extends StatelessWidget {
+  const _TeamCard({
+    required this.store,
+    required this.students,
+    required this.team,
+    required this.onClear,
+  });
+
+  final CrmStore store;
+  final List<Student> students;
+  final Set<String> team;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final members = students.where((s) => team.contains(s.id)).toList();
+    final total = members.fold(0, (sum, s) => sum + store.pointsOf(s.id));
+    // The team stands in for its own members, so it is ranked against the
+    // pupils who stayed out of it.
+    final rank =
+        1 +
+        students
+            .where((s) => !team.contains(s.id))
+            .where((s) => store.pointsOf(s.id) > total)
+            .length;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.rewardGreen.withValues(alpha: .16),
+            AppColors.primary.withValues(alpha: .14),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.rewardGreen.withValues(alpha: .4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '⚔️ Vaqtinchalik jamoa',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+              if (members.isNotEmpty)
+                TextButton.icon(
+                  onPressed: onClear,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Tozalash'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          if (members.length < 2)
+            Text(
+              members.isEmpty
+                  ? 'Ballarini birlashtirish uchun jadvaldan kamida ikki '
+                        'o‘quvchini belgilang.'
+                  : 'Yana kamida bitta o‘quvchini belgilang.',
+              style: const TextStyle(color: AppColors.muted),
+            )
+          else ...[
+            Text(
+              members.map((s) => s.name).join(' + '),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _TeamStat(
+                  icon: Icons.stars_rounded,
+                  label: 'Jamoa bali',
+                  value: '$total',
+                  color: AppColors.rewardGreen,
+                ),
+                _TeamStat(
+                  icon: Icons.leaderboard_rounded,
+                  label: 'O‘rin',
+                  value: '$rank',
+                  color: AppColors.primary,
+                ),
+                _TeamStat(
+                  icon: Icons.group_rounded,
+                  label: 'A’zolar',
+                  value: '${members.length}',
+                  color: AppColors.muted,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              rank == 1
+                  ? 'Bu jamoa birinchi o‘rinni egallardi 👑'
+                  : 'Bu jamoa $rank-o‘rinda bo‘lardi.',
+              style: const TextStyle(color: AppColors.muted),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TeamStat extends StatelessWidget {
+  const _TeamStat({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: AppColors.muted),
+        ),
+      ],
+    ),
+  );
 }
 
 /// Every reward and penalty a pupil has been given, newest first, with a

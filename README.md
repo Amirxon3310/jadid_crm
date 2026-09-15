@@ -190,6 +190,15 @@ ustozi o‘sha oynadan yangi rag‘bat yoki jarima qo‘shadi; o‘quvchi faqat 
 tarixini ko‘radi. Cheklovlar `score_awards` jadvalining RLS qoidalarida ham
 takrorlangan, jami ball esa serverdagi hisobga ham kiradi.
 
+Reyting o‘yin ko‘rinishida: 1–3 o‘rin toj bilan (oltin, kumush, bronza)
+belgilanadi, rag‘bat va jarima yorqin yashil/qizil nishonlarda, jami ball esa
+alohida ajratilgan. **Jamoa tuzish** tugmasi jadvalda belgilash imkonini
+ochadi: bir nechta o‘quvchi tanlansa, ularning ballari qo‘shiladi va shu
+jamoa qolgan o‘quvchilar orasida nechanchi o‘rinda bo‘lishi ko‘rsatiladi
+(masalan “Abdulloh + Akbar — 145 ball, 2-o‘rinda bo‘lardi”). Bu faqat
+taqqoslash uchun: tanlov hech qayerga saqlanmaydi, o‘quvchilarning shaxsiy
+ballari o‘zgarmaydi, boshqa juftlikni sinash uchun **Tozalash** bosiladi.
+
 Uy vazifasi bitta “Vazifa” maydoni bilan beriladi (alohida “tushuntirish”
 maydoni yo‘q) va ixtiyoriy fayl biriktiriladi (`homework-files` yopiq
 bucketida saqlanadi, faqat shu guruh xodimlari va o‘quvchilari ko‘radi).

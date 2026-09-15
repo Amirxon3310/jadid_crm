@@ -11,6 +11,15 @@ abstract final class AppColors {
   static const muted = Color(0xFF737373);
   static const ink = Color(0xFF061425);
 
+  // The rating board is meant to feel like a game, so its rewards and
+  // penalties shout louder than the calm greens and reds the rest of the
+  // app reports status with.
+  static const rewardGreen = Color(0xFF00C853);
+  static const penaltyRed = Color(0xFFFF1744);
+  static const gold = Color(0xFFFFC107);
+  static const silver = Color(0xFF9E9E9E);
+  static const bronze = Color(0xFFCD7F32);
+
   /// A soft primary-tinted fill for icon badges, avatars and selected tabs.
   /// The flat light-blue works on a white surface but needs a translucent
   /// tint on a dark one, so this reads the active theme instead of being a

@@ -244,7 +244,7 @@ void main() {
     expect(find.text('10'), findsOneWidget);
     expect(find.text('+7'), findsOneWidget);
     expect(find.text('-3'), findsOneWidget);
-    expect(find.text('14'), findsOneWidget);
+    expect(find.text('14 ball'), findsOneWidget);
 
     // Tapping the pupil shows who gave what, and why.
     await tester.tap(find.text('Ali Karimov'));
@@ -263,6 +263,84 @@ void main() {
     await tester.pumpAndSettle();
     expect(store.bonusPointsOf('student-1'), 12);
     expect(find.text('Uyga vazifani a’lo bajardi'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a temporary team sums its pupils and takes their place', (
+    tester,
+  ) async {
+    final store = CrmStore()..changeRole(AppRole.admin);
+    addTearDown(store.dispose);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1440, 1000);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    store.users.addAll([
+      const AppUser(
+        id: 'student-2',
+        name: 'Madina Salimova',
+        role: AppRole.student,
+      ),
+      const AppUser(
+        id: 'student-3',
+        name: 'Aziz Rustamov',
+        role: AppRole.student,
+      ),
+    ]);
+    store.attendance.clear();
+    store.results.clear();
+    // 35 / 20 / 10, so the pair behind still falls short of the leader.
+    for (final (id, amount) in [
+      ('student-1', 35),
+      ('student-2', 20),
+      ('student-3', 10),
+    ]) {
+      await store.addScoreAward(
+        studentId: id,
+        groupId: 'g1',
+        amount: amount,
+        note: 'boshlang‘ich',
+      );
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: GroupPage(store: store, group: store.groups.first, startTab: 4),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('35 ball'), findsOneWidget);
+
+    await tester.tap(find.text('Jamoa tuzish'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('kamida ikki'), findsOneWidget);
+
+    // The two behind the leader, together, edge past them.
+    await tester.tap(find.text('Madina Salimova'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Aziz Rustamov'));
+    await tester.pumpAndSettle();
+    expect(find.text('Madina Salimova + Aziz Rustamov'), findsOneWidget);
+    expect(find.text('30'), findsOneWidget); // 20 + 10, the team's own score
+    expect(find.textContaining('birinchi o‘rinni'), findsNothing);
+    expect(find.textContaining('2-o‘rinda'), findsOneWidget);
+
+    // Adding the leader puts the team clear of everyone left.
+    await tester.tap(find.text('Ali Karimov'));
+    await tester.pumpAndSettle();
+    expect(find.text('65'), findsOneWidget);
+    expect(find.textContaining('birinchi o‘rinni'), findsOneWidget);
+
+    // It is a what-if only: nobody's own score moved.
+    expect(store.pointsOf('student-1'), 35);
+    expect(store.pointsOf('student-2'), 20);
+    expect(store.pointsOf('student-3'), 10);
+
+    await tester.tap(find.text('Tozalash'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('kamida ikki'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
