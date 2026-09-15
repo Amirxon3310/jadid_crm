@@ -1271,7 +1271,7 @@ String _monthLabel(DateTime month) =>
 /// colors used for the status chip elsewhere in the app.
 Color _journalHomeworkColor(HomeworkStatus status) => switch (status) {
   HomeworkStatus.submitted => AppColors.primary,
-  HomeworkStatus.accepted => AppColors.success,
+  HomeworkStatus.accepted => AppColors.rewardGreen,
   HomeworkStatus.waiting || HomeworkStatus.returned => AppColors.danger,
 };
 
@@ -1786,7 +1786,7 @@ String _homeworkLabel(HomeworkStatus status) => switch (status) {
 Color _homeworkColor(HomeworkStatus status) => switch (status) {
   HomeworkStatus.waiting => AppColors.muted,
   HomeworkStatus.submitted => AppColors.warning,
-  HomeworkStatus.accepted => AppColors.success,
+  HomeworkStatus.accepted => AppColors.rewardGreen,
   HomeworkStatus.returned => AppColors.danger,
 };
 
@@ -1969,6 +1969,10 @@ class _RankingTabState extends State<_RankingTab> {
     final students = _visibleStudents(store, group.id)
       ..sort((a, b) => store.pointsOf(b.id).compareTo(store.pointsOf(a.id)));
     team.retainWhere((id) => students.any((s) => s.id == id));
+    // Staff get a give-points button on every row; it stays visible but
+    // disabled when the database has no awards table yet, so the reason is
+    // on screen instead of the button simply being missing.
+    final canAward = store.canManageGroup(group.id) && !teamMode;
 
     return Surface(
       child: Column(
@@ -2049,13 +2053,20 @@ class _RankingTabState extends State<_RankingTab> {
                   child: DataTable(
                     columnSpacing: 20,
                     showCheckboxColumn: teamMode,
-                    columns: const [
-                      DataColumn(label: Text('#')),
-                      DataColumn(label: Text('O‘quvchi')),
-                      DataColumn(label: Text('Dars ballari'), numeric: true),
-                      DataColumn(label: Text('Rag‘bat'), numeric: true),
-                      DataColumn(label: Text('Jarima'), numeric: true),
-                      DataColumn(label: Text('Jami'), numeric: true),
+                    // The board reads as one list, without ruled lines
+                    // between the pupils.
+                    dividerThickness: 0,
+                    columns: [
+                      const DataColumn(label: Text('#')),
+                      const DataColumn(label: Text('O‘quvchi')),
+                      const DataColumn(
+                        label: Text('Dars ballari'),
+                        numeric: true,
+                      ),
+                      const DataColumn(label: Text('Rag‘bat'), numeric: true),
+                      const DataColumn(label: Text('Jarima'), numeric: true),
+                      const DataColumn(label: Text('Jami'), numeric: true),
+                      if (canAward) const DataColumn(label: Text('')),
                     ],
                     rows: [
                       for (final (index, student) in students.indexed)
@@ -2108,7 +2119,13 @@ class _RankingTabState extends State<_RankingTab> {
                               ),
                             ),
                             DataCell(
-                              Text('${store.lessonPointsOf(student.id)}'),
+                              Text(
+                                '${store.lessonPointsOf(student.id)}',
+                                style: const TextStyle(
+                                  color: AppColors.rewardGreen,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                             DataCell(
                               _SignedPoints(store.bonusPointsOf(student.id)),
@@ -2117,6 +2134,30 @@ class _RankingTabState extends State<_RankingTab> {
                               _SignedPoints(store.penaltyPointsOf(student.id)),
                             ),
                             DataCell(_TotalPoints(store.pointsOf(student.id))),
+                            if (canAward)
+                              DataCell(
+                                Tooltip(
+                                  message: store.scoreAwardsReady
+                                      ? 'Ball qo‘shish'
+                                      : 'Bu imkoniyat uchun bazaga '
+                                            'score_awards migratsiyasi '
+                                            'qo‘llanishi kerak',
+                                  child: IconButton(
+                                    onPressed: store.scoreAwardsReady
+                                        ? () => showAddAward(
+                                            context,
+                                            store,
+                                            group,
+                                            student,
+                                          )
+                                        : null,
+                                    icon: const Icon(
+                                      Icons.add_circle_rounded,
+                                      color: AppColors.rewardGreen,
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                     ],
@@ -2336,15 +2377,7 @@ Future<void> _showAwardHistory(
                         '${award.byName} • ${shortDate(award.createdAt)}',
                       ),
                     ),
-                  if (!store.scoreAwardsReady)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 12),
-                      child: Text(
-                        'Qo‘shimcha ball imkoniyati bazaga hali qo‘shilmagan.',
-                        style: TextStyle(color: AppColors.muted),
-                      ),
-                    )
-                  else if (store.canManageGroup(group.id)) ...[
+                  if (store.canManageGroup(group.id)) ...[
                     const Divider(height: 26),
                     Align(
                       alignment: Alignment.centerLeft,
@@ -2352,12 +2385,25 @@ Future<void> _showAwardHistory(
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.rewardGreen,
                         ),
-                        onPressed: () =>
-                            showAddAward(context, store, group, student),
+                        onPressed: store.scoreAwardsReady
+                            ? () => showAddAward(context, store, group, student)
+                            : null,
                         icon: const Icon(Icons.add_rounded),
                         label: const Text('Ball qo‘shish'),
                       ),
                     ),
+                    if (!store.scoreAwardsReady)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 10),
+                        child: Text(
+                          'Buning uchun bazaga score_awards migratsiyasi '
+                          'qo‘llanishi kerak.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                      ),
                   ],
                 ],
               ),

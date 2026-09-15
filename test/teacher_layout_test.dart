@@ -256,6 +256,7 @@ void main() {
     // A plain number rewards, from its own window.
     await tester.tap(find.widgetWithText(FilledButton, 'Ball qo‘shish'));
     await tester.pumpAndSettle();
+    expect(find.text('Ali Karimov — ball qo‘shish'), findsOneWidget);
     await tester.enterText(find.widgetWithText(TextField, 'Ball'), '5');
     await tester.pumpAndSettle();
     expect(find.text('rag‘bat'), findsOneWidget);
@@ -279,6 +280,40 @@ void main() {
     await tester.pumpAndSettle();
     expect(store.penaltyPointsOf('student-1'), -7);
     expect(store.bonusPointsOf('student-1'), 12);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('every rating row carries its own give-points button', (
+    tester,
+  ) async {
+    final store = CrmStore()..changeRole(AppRole.admin);
+    addTearDown(store.dispose);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1440, 1000);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: GroupPage(store: store, group: store.groups.first, startTab: 4),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Reachable straight from the row, without opening the history first.
+    final give = find.widgetWithIcon(IconButton, Icons.add_circle_rounded);
+    expect(give, findsWidgets);
+    await tester.tap(give.first);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('ball qo‘shish'), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextField, 'Ball'), '-6');
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Saqlash'));
+    await tester.pumpAndSettle();
+    expect(store.penaltyPointsOf('student-1'), -6);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

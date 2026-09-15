@@ -89,7 +89,7 @@ class _StudentStatus extends StatelessWidget {
     final (text, color) = switch (result.status) {
       HomeworkStatus.waiting => ('Bajarilmagan', AppColors.muted),
       HomeworkStatus.submitted => ('Tekshirilmoqda', AppColors.warning),
-      HomeworkStatus.accepted => ('Qabul qilindi', AppColors.success),
+      HomeworkStatus.accepted => ('Qabul qilindi', AppColors.rewardGreen),
       HomeworkStatus.returned => ('Qaytarildi', AppColors.danger),
     };
     return Text(

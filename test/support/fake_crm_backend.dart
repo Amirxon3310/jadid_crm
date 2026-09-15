@@ -10,6 +10,7 @@ class FakeCrmBackend {
   String authId = 'admin';
   int writeNumber = 0;
   final failWriteNumbers = <int>{};
+
   /// Tables a database predating their migration would not have yet.
   final missingTables = <String>{};
   Completer<void>? writeGate;
