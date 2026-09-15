@@ -378,11 +378,30 @@ void main() {
     expect(find.textContaining('birinchi o‘rinni'), findsNothing);
     expect(find.textContaining('2-o‘rinda'), findsOneWidget);
 
+    // Each figure is read from the chip carrying its own label.
+    Color statColor(String label) {
+      final chip = find
+          .ancestor(of: find.text(label), matching: find.byType(Row))
+          .first;
+      return tester
+          .widget<Text>(
+            find.descendant(of: chip, matching: find.byType(Text)).first,
+          )
+          .style!
+          .color!;
+    }
+
+    // Last of the two places on offer, so the rank reads red; the member
+    // count is always primary.
+    expect(statColor('O‘rin'), AppColors.penaltyRed);
+    expect(statColor('A’zolar'), AppColors.primary);
+
     // Adding the leader puts the team clear of everyone left.
     await tester.tap(find.text('Ali Karimov'));
     await tester.pumpAndSettle();
     expect(find.text('65'), findsOneWidget);
     expect(find.textContaining('birinchi o‘rinni'), findsOneWidget);
+    expect(statColor('O‘rin'), AppColors.rewardGreen);
 
     // It is a what-if only: nobody's own score moved.
     expect(store.pointsOf('student-1'), 35);

@@ -2136,25 +2136,17 @@ class _RankingTabState extends State<_RankingTab> {
                             DataCell(_TotalPoints(store.pointsOf(student.id))),
                             if (canAward)
                               DataCell(
-                                Tooltip(
-                                  message: store.scoreAwardsReady
-                                      ? 'Ball qo‘shish'
-                                      : 'Bu imkoniyat uchun bazaga '
-                                            'score_awards migratsiyasi '
-                                            'qo‘llanishi kerak',
-                                  child: IconButton(
-                                    onPressed: store.scoreAwardsReady
-                                        ? () => showAddAward(
-                                            context,
-                                            store,
-                                            group,
-                                            student,
-                                          )
-                                        : null,
-                                    icon: const Icon(
-                                      Icons.add_circle_rounded,
-                                      color: AppColors.rewardGreen,
-                                    ),
+                                IconButton(
+                                  tooltip: 'Ball qo‘shish',
+                                  onPressed: () => showAddAward(
+                                    context,
+                                    store,
+                                    group,
+                                    student,
+                                  ),
+                                  icon: const Icon(
+                                    Icons.add_circle_rounded,
+                                    color: AppColors.rewardGreen,
                                   ),
                                 ),
                               ),
@@ -2192,12 +2184,16 @@ class _TeamCard extends StatelessWidget {
     final total = members.fold(0, (sum, s) => sum + store.pointsOf(s.id));
     // The team stands in for its own members, so it is ranked against the
     // pupils who stayed out of it.
+    final outsiders = students.where((s) => !team.contains(s.id)).toList();
     final rank =
-        1 +
-        students
-            .where((s) => !team.contains(s.id))
-            .where((s) => store.pointsOf(s.id) > total)
-            .length;
+        1 + outsiders.where((s) => store.pointsOf(s.id) > total).length;
+    // Top of the board is green, the bottom red, anything between amber.
+    final places = outsiders.length + 1;
+    final rankColor = rank == 1
+        ? AppColors.rewardGreen
+        : rank >= places
+        ? AppColors.penaltyRed
+        : AppColors.warning;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -2260,13 +2256,13 @@ class _TeamCard extends StatelessWidget {
                   icon: Icons.leaderboard_rounded,
                   label: 'O‘rin',
                   value: '$rank',
-                  color: AppColors.ink,
+                  color: rankColor,
                 ),
                 _TeamStat(
                   icon: Icons.group_rounded,
                   label: 'A’zolar',
                   value: '${members.length}',
-                  color: AppColors.muted,
+                  color: AppColors.primary,
                 ),
               ],
             ),
@@ -2385,25 +2381,12 @@ Future<void> _showAwardHistory(
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.rewardGreen,
                         ),
-                        onPressed: store.scoreAwardsReady
-                            ? () => showAddAward(context, store, group, student)
-                            : null,
+                        onPressed: () =>
+                            showAddAward(context, store, group, student),
                         icon: const Icon(Icons.add_rounded),
                         label: const Text('Ball qo‘shish'),
                       ),
                     ),
-                    if (!store.scoreAwardsReady)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 10),
-                        child: Text(
-                          'Buning uchun bazaga score_awards migratsiyasi '
-                          'qo‘llanishi kerak.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.muted,
-                          ),
-                        ),
-                      ),
                   ],
                 ],
               ),
@@ -2430,6 +2413,9 @@ Future<void> showAddAward(
   StudyGroup group,
   Student student,
 ) {
+  // Without the awards table there is nowhere to save to, so say what is
+  // missing instead of opening a form that cannot succeed.
+  if (!store.scoreAwardsReady) return _showAwardsSetup(context);
   final amount = TextEditingController();
   final note = TextEditingController();
   return showFormDialog<void>(
@@ -2537,3 +2523,30 @@ Future<void> showAddAward(
     ),
   );
 }
+
+/// The awards table has to exist before points can be handed out. Rather
+/// than a button that does nothing, say which migration is missing.
+Future<void> _showAwardsSetup(BuildContext context) => showDialog<void>(
+  context: context,
+  builder: (dialogContext) => AlertDialog(
+    icon: const Icon(Icons.storage_rounded, color: AppColors.warning),
+    title: const Text('Ball qo‘shish uchun bir marta sozlash'),
+    content: const SizedBox(
+      width: 460,
+      child: Text(
+        'Qo‘shimcha ball uchun bazada alohida jadval kerak, u hali '
+        'qo‘llanmagan.\n\n'
+        'Supabase → SQL Editor’da quyidagi faylni bir marta bajaring:\n'
+        'supabase/migrations/20260916140000_score_awards.sql\n\n'
+        'Shundan keyin shu oynadan ball berish ishlaydi. Ilovaning qolgan '
+        'qismi hozir ham normal ishlaydi.',
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(dialogContext),
+        child: const Text('Yopish'),
+      ),
+    ],
+  ),
+);
