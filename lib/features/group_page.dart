@@ -60,16 +60,19 @@ class _GroupPageState extends State<GroupPage> {
         .firstOrNull;
     if (group == null)
       return Scaffold(
-        appBar: AppBar(title: const Text('Guruh')),
-        body: Center(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Guruh saqlanmadi.'),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Orqaga qaytish'),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                ),
+              ),
+              const Expanded(
+                child: Center(child: Text('Guruh saqlanmadi.')),
               ),
             ],
           ),
@@ -93,62 +96,106 @@ class _GroupPageState extends State<GroupPage> {
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        actions: [
-          if (widget.store.activeRole == AppRole.admin)
-            IconButton(
-              tooltip: 'Guruhni tahrirlash',
-              icon: const AppIcon('edit', size: 22),
-              onPressed: () =>
-                  editStudyGroup(context, widget.store, group: group),
-            ),
-        ],
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              group.name,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            Text(
-              '${group.teacherName} • ${group.statusLabel}',
-              style: const TextStyle(fontSize: 12, color: AppColors.primary),
-            ),
-          ],
-        ),
-      ),
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
-            Container(
-              width: double.infinity,
-              color: Colors.white,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: List.generate(labels.length, (index) {
-                    final selected = tab == index;
-                    return Padding(
-                      padding: const EdgeInsets.only(
-                        right: 8,
-                        top: 10,
-                        bottom: 10,
-                      ),
-                      child: TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: selected
-                              ? AppColors.primary
-                              : AppColors.muted,
-                          backgroundColor: selected
-                              ? AppColors.softBlue
-                              : Colors.transparent,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 12, 4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: .07),
+                          blurRadius: 24,
+                          offset: const Offset(0, 10),
                         ),
-                        onPressed: () => setState(() => tab = index),
-                        child: Text(labels[index]),
-                      ),
-                    );
-                  }),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                size: 18,
+                              ),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    group.name,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${group.teacherName} • ${group.statusLabel}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (widget.store.activeRole == AppRole.admin)
+                              IconButton(
+                                tooltip: 'Guruhni tahrirlash',
+                                icon: const AppIcon('edit', size: 22),
+                                onPressed: () => editStudyGroup(
+                                  context,
+                                  widget.store,
+                                  group: group,
+                                ),
+                              ),
+                          ],
+                        ),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.only(left: 4),
+                          child: Row(
+                            children: List.generate(labels.length, (index) {
+                              final selected = tab == index;
+                              return Padding(
+                                padding: const EdgeInsets.only(
+                                  right: 8,
+                                  bottom: 6,
+                                ),
+                                child: TextButton(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: selected
+                                        ? AppColors.primary
+                                        : AppColors.muted,
+                                    backgroundColor: selected
+                                        ? AppColors.softBlue
+                                        : Colors.transparent,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  onPressed: () => setState(() => tab = index),
+                                  child: Text(labels[index]),
+                                ),
+                              );
+                            }),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -243,45 +290,75 @@ class _InfoTab extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               for (final student in students)
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(vertical: 3),
-                  leading: CircleAvatar(
-                    child: Text(student.name.substring(0, 1)),
-                  ),
-                  title: Text(student.name),
-                  subtitle: Text(student.phone),
-                  trailing: store.canManageGroup(group.id)
-                      ? PopupMenuButton<String>(
-                          tooltip: 'Guruhdagi o‘qish holati',
-                          initialValue: student.status,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final info = Row(
+                        children: [
+                          CircleAvatar(
+                            child: Text(student.name.substring(0, 1)),
                           ),
-                          onSelected: (value) => runCrmAction(
-                            context,
-                            () => store.setEnrollmentStatus(
-                              student.id,
-                              group.id,
-                              value,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  student.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  student.phone,
+                                  style: const TextStyle(
+                                    color: AppColors.muted,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(
-                              value: 'active',
-                              child: Text('Aktiv'),
-                            ),
-                            PopupMenuItem(
-                              value: 'completed',
-                              child: Text('Tugatgan'),
-                            ),
-                            PopupMenuItem(value: 'left', child: Text('Ketgan')),
+                        ],
+                      );
+                      // Only admin edits enrollment status; a group's own
+                      // teacher can manage lessons/homework but not this.
+                      final status = store.activeRole == AppRole.admin
+                          ? Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                for (final option in _enrollmentStatuses)
+                                  ChoiceChip(
+                                    label: Text(option.label),
+                                    selected: student.status == option.value,
+                                    onSelected: (_) => runCrmAction(
+                                      context,
+                                      () => store.setEnrollmentStatus(
+                                        student.id,
+                                        group.id,
+                                        option.value,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            )
+                          : _StatusTag(student.statusLabel, student.status);
+                      if (constraints.maxWidth < 560) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            info,
+                            const SizedBox(height: 8),
+                            status,
                           ],
-                          child: Chip(
-                            label: Text(student.statusLabel),
-                            avatar: const Icon(Icons.expand_more, size: 18),
-                          ),
-                        )
-                      : Text(student.statusLabel),
+                        );
+                      }
+                      return Row(
+                        children: [Expanded(child: info), status],
+                      );
+                    },
+                  ),
                 ),
             ],
           ),
@@ -1125,12 +1202,13 @@ class _JournalTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lessons = store
-        .lessonsOf(group.id)
-        .where((l) => l.status != 'cancelled')
-        .toList();
+    final lessons =
+        store.lessonsOf(group.id).where((l) => l.status != 'cancelled').toList()
+          ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
     final homeworks = store.homeworksOf(group.id);
     final students = _visibleStudents(store, group.id);
+    Homework? homeworkFor(Lesson lesson) =>
+        homeworks.where((h) => h.lessonId == lesson.id).firstOrNull;
 
     return Surface(
       child: Column(
@@ -1142,50 +1220,184 @@ class _JournalTab extends StatelessWidget {
           ),
           const SizedBox(height: 5),
           const Text(
-            'Davomat va uy vazifalari bo‘yicha umumiy natija',
+            'Har bir o‘quvchining har darsdagi davomati va uy vazifasi',
             style: TextStyle(color: AppColors.muted),
           ),
-          const SizedBox(height: 18),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              columns: const [
-                DataColumn(label: Text('O‘quvchi')),
-                DataColumn(label: Text('Davomat')),
-                DataColumn(label: Text('Uy vazifasi')),
-                DataColumn(label: Text('O‘rtacha baho')),
-              ],
-              rows: students.map((student) {
-                final attended = lessons.where((lesson) {
-                  final status = store.attendance[lesson.id]?[student.id];
-                  return status == AttendanceStatus.present ||
-                      status == AttendanceStatus.late;
-                }).length;
-                final homeworkResults = homeworks
-                    .map((homework) => store.resultFor(homework.id, student.id))
-                    .toList();
-                final accepted = homeworkResults
-                    .where((result) => result.status == HomeworkStatus.accepted)
-                    .length;
-                final scores = homeworkResults
-                    .where((result) => result.score != null)
-                    .map((result) => result.score!)
-                    .toList();
-                final average = scores.isEmpty
-                    ? '—'
-                    : (scores.reduce((a, b) => a + b) / scores.length)
-                          .toStringAsFixed(1);
-                return DataRow(
-                  cells: [
-                    DataCell(Text(student.name)),
-                    DataCell(Text('$attended/${lessons.length}')),
-                    DataCell(Text('$accepted/${homeworks.length}')),
-                    DataCell(Text(average)),
-                  ],
-                );
-              }).toList(),
-            ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 16,
+            runSpacing: 6,
+            children: [
+              _JournalLegend(
+                icon: Icons.check_circle,
+                color: AppColors.success,
+                label: 'Keldi',
+              ),
+              _JournalLegend(
+                icon: Icons.schedule,
+                color: AppColors.warning,
+                label: 'Kechikdi',
+              ),
+              _JournalLegend(
+                icon: Icons.cancel,
+                color: AppColors.danger,
+                label: 'Kelmadi',
+              ),
+              _JournalLegend(
+                icon: Icons.remove_circle_outline,
+                color: AppColors.muted,
+                label: 'Belgilanmagan',
+              ),
+              _JournalLegend(
+                icon: Icons.assignment_outlined,
+                color: AppColors.primary,
+                label: 'Shu darsga uy vazifasi bor',
+              ),
+            ],
           ),
+          const SizedBox(height: 18),
+          if (lessons.isEmpty)
+            const EmptyState(text: 'Darslar hali yaratilmagan')
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columnSpacing: 22,
+                columns: [
+                  const DataColumn(label: Text('O‘quvchi')),
+                  for (final lesson in lessons)
+                    DataColumn(
+                      label: Tooltip(
+                        message: lesson.topic,
+                        child: Text(shortDate(lesson.startsAt)),
+                      ),
+                    ),
+                  const DataColumn(label: Text('Davomat'), numeric: true),
+                  const DataColumn(label: Text('Uy vazifa'), numeric: true),
+                ],
+                rows: students.map((student) {
+                  final attended = lessons.where((lesson) {
+                    final status = store.attendance[lesson.id]?[student.id];
+                    return status == AttendanceStatus.present ||
+                        status == AttendanceStatus.late;
+                  }).length;
+                  final accepted = homeworks
+                      .where(
+                        (h) =>
+                            store.resultFor(h.id, student.id).status ==
+                            HomeworkStatus.accepted,
+                      )
+                      .length;
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(student.name),
+                            if (student.status != 'active') ...[
+                              const SizedBox(width: 8),
+                              _StatusTag(student.statusLabel, student.status),
+                            ],
+                          ],
+                        ),
+                      ),
+                      for (final lesson in lessons)
+                        DataCell(
+                          _JournalCell(
+                            attendance: store.attendance[lesson.id]?[student.id],
+                            homework: homeworkFor(lesson),
+                            homeworkStatus: homeworkFor(lesson) == null
+                                ? null
+                                : store
+                                      .resultFor(
+                                        homeworkFor(lesson)!.id,
+                                        student.id,
+                                      )
+                                      .status,
+                          ),
+                        ),
+                      DataCell(
+                        Text(
+                          lessons.isEmpty
+                              ? '—'
+                              : '${(attended * 100 / lessons.length).round()}%',
+                        ),
+                      ),
+                      DataCell(
+                        Text(
+                          homeworks.isEmpty
+                              ? '—'
+                              : '${(accepted * 100 / homeworks.length).round()}%',
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JournalLegend extends StatelessWidget {
+  const _JournalLegend({
+    required this.icon,
+    required this.color,
+    required this.label,
+  });
+  final IconData icon;
+  final Color color;
+  final String label;
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 15, color: color),
+      const SizedBox(width: 5),
+      Text(label, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+    ],
+  );
+}
+
+/// One lesson's cell in the journal: attendance on top, and — only when a
+/// homework is linked to that lesson — its status underneath.
+class _JournalCell extends StatelessWidget {
+  const _JournalCell({
+    required this.attendance,
+    required this.homework,
+    required this.homeworkStatus,
+  });
+  final AttendanceStatus? attendance;
+  final Homework? homework;
+  final HomeworkStatus? homeworkStatus;
+  @override
+  Widget build(BuildContext context) {
+    final parts = [
+      attendance == null ? 'Davomat belgilanmagan' : _attendanceLabel(attendance!),
+      if (homework != null && homeworkStatus != null)
+        'Uy vazifa: ${_homeworkLabel(homeworkStatus!)}',
+    ];
+    return Tooltip(
+      message: parts.join(' • '),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _attendanceIcon(attendance),
+            size: 18,
+            color: _attendanceColor(attendance),
+          ),
+          if (homework != null) ...[
+            const SizedBox(height: 3),
+            Icon(
+              Icons.assignment_outlined,
+              size: 13,
+              color: _homeworkColor(homeworkStatus!),
+            ),
+          ],
         ],
       ),
     );
@@ -1211,6 +1423,55 @@ Color _homeworkColor(HomeworkStatus status) => switch (status) {
   HomeworkStatus.accepted => AppColors.success,
   HomeworkStatus.returned => AppColors.danger,
 };
+
+Color _attendanceColor(AttendanceStatus? status) => switch (status) {
+  AttendanceStatus.present => AppColors.success,
+  AttendanceStatus.late => AppColors.warning,
+  AttendanceStatus.absent => AppColors.danger,
+  null => AppColors.muted,
+};
+
+IconData _attendanceIcon(AttendanceStatus? status) => switch (status) {
+  AttendanceStatus.present => Icons.check_circle,
+  AttendanceStatus.late => Icons.schedule,
+  AttendanceStatus.absent => Icons.cancel,
+  null => Icons.remove_circle_outline,
+};
+
+const _enrollmentStatuses = [
+  (value: 'active', label: 'Aktiv'),
+  (value: 'completed', label: 'Tugatgan'),
+  (value: 'left', label: 'Ketgan'),
+];
+
+Color _enrollmentColor(String status) => switch (status) {
+  'left' => AppColors.danger,
+  'completed' => AppColors.primary,
+  _ => AppColors.success,
+};
+
+/// Read-only status label; only admin gets an editable control (see
+/// [_InfoTab]) so a group's own teacher cannot move a student in or out.
+class _StatusTag extends StatelessWidget {
+  const _StatusTag(this.label, this.status);
+  final String label;
+  final String status;
+  @override
+  Widget build(BuildContext context) {
+    final color = _enrollmentColor(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
 
 List<Student> _visibleStudents(CrmStore store, String groupId) {
   final students = store.studentsOf(groupId);

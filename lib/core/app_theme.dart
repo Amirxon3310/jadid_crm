@@ -56,6 +56,11 @@ ThemeData buildTheme({Brightness brightness = Brightness.light}) => ThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
   ),
+  // A tappable row's hover/splash highlight should hug its own rounded
+  // corners instead of the default sharp rectangle bleeding past them.
+  listTileTheme: ListTileThemeData(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+  ),
 );
 
 class Surface extends StatelessWidget {

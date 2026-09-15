@@ -170,6 +170,62 @@ extension TeacherStore on CrmStore {
     );
   }
 
+  HomeworkStatus? _homeworkStatusFor(String homeworkId, String studentId) =>
+      results
+          .where(
+            (r) =>
+                r.homeworkId == resolveId(homeworkId) &&
+                r.studentId == studentId,
+          )
+          .firstOrNull
+          ?.status;
+
+  /// Share of scheduled lessons the group's students attended (present or
+  /// late), averaged across students. `null` when there is nothing to show.
+  double? groupAttendanceRate(String groupId) {
+    final lessons = lessonsOf(
+      groupId,
+    ).where((l) => l.status != 'cancelled').toList();
+    final groupStudents = studentsOf(groupId);
+    if (lessons.isEmpty || groupStudents.isEmpty) return null;
+    final attended = groupStudents.fold<int>(
+      0,
+      (sum, student) =>
+          sum +
+          lessons.where((lesson) {
+            final status = attendance[lesson.id]?[student.id];
+            return status == AttendanceStatus.present ||
+                status == AttendanceStatus.late;
+          }).length,
+    );
+    return attended * 100 / (lessons.length * groupStudents.length);
+  }
+
+  /// Share of homework the group's students got accepted, averaged across
+  /// students. `null` when there is nothing to show.
+  double? groupHomeworkRate(String groupId) {
+    final homework = homeworksOf(groupId);
+    final groupStudents = studentsOf(groupId);
+    if (homework.isEmpty || groupStudents.isEmpty) return null;
+    final accepted = groupStudents.fold<int>(
+      0,
+      (sum, student) =>
+          sum +
+          homework
+              .where(
+                (item) =>
+                    _homeworkStatusFor(item.id, student.id) ==
+                    HomeworkStatus.accepted,
+              )
+              .length,
+    );
+    return accepted * 100 / (homework.length * groupStudents.length);
+  }
+
+  /// Group ranking value: the total coins its students have collected.
+  int groupCoinTotal(String groupId) =>
+      studentsOf(groupId).fold(0, (sum, student) => sum + coinsOf(student.id));
+
   void requireActiveGroup(String id) {
     if (!canManageGroup(id))
       throw StateError('Guruhni boshqarishga ruxsat yo‘q.');

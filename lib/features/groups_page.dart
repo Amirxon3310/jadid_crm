@@ -16,15 +16,25 @@ class GroupsPage extends StatefulWidget {
   State<GroupsPage> createState() => _GroupsPageState();
 }
 
+const _statusFilters = [
+  (null, 'Hammasi'),
+  ('active', 'Faol'),
+  ('completed', 'Tugatilgan'),
+  ('frozen', 'Muzlatilgan'),
+];
+
 class _GroupsPageState extends State<GroupsPage> {
   String query = '';
+  String? statusFilter;
 
   @override
   Widget build(BuildContext context) {
     final groups = widget.store.visibleGroups.where((group) {
-      return '${group.name} ${group.course} ${group.teacherName}'
+      final matchesQuery = '${group.name} ${group.course} ${group.teacherName}'
           .toLowerCase()
           .contains(query.toLowerCase());
+      return matchesQuery &&
+          (statusFilter == null || group.status == statusFilter);
     }).toList();
 
     return Surface(
@@ -61,14 +71,29 @@ class _GroupsPageState extends State<GroupsPage> {
               );
             },
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _statusFilters.map((filter) {
+              final (value, label) = filter;
+              return ChoiceChip(
+                label: Text(label),
+                selected: statusFilter == value,
+                onSelected: (_) => setState(() => statusFilter = value),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
           if (groups.isEmpty)
             const EmptyState(
               text: 'Guruh topilmadi',
               icon: Icons.groups_outlined,
             ),
-          for (final group in groups)
+          for (final group in groups) ...[
+            const Divider(height: 1),
             _GroupTile(store: widget.store, group: group),
+          ],
         ],
       ),
     );
@@ -86,70 +111,91 @@ class _GroupTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final attendance = store.groupAttendanceRate(group.id);
+    final homework = store.groupHomeworkRate(group.id);
+    final coins = store.groupCoinTotal(group.id);
+    return Material(
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(16),
-      onTap: () => _open(context),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: AppColors.softBlue,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: const AppIcon('groups', active: true),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _open(context),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    group.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  Icon(
+                    group.active
+                        ? Icons.check_circle
+                        : Icons.cancel_outlined,
+                    color: group.active ? AppColors.success : AppColors.danger,
+                    size: 22,
                   ),
-                  const SizedBox(height: 5),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 5,
-                    children: [
-                      Text(
-                        '${group.course} • ${group.statusLabel}',
-                        style: const TextStyle(color: AppColors.muted),
-                      ),
-                      Text(
-                        '${store.studentsOf(group.id).length} o‘quvchi',
-                        style: const TextStyle(color: AppColors.muted),
-                      ),
-                      InkWell(
-                        onTap: () => _open(context),
-                        child: Text(
-                          group.teacherName,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          group.name,
                           style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 3),
+                        Text(
+                          '${group.course} • ${group.teacherName}',
+                          style: const TextStyle(color: AppColors.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (store.activeRole == AppRole.admin)
+                    IconButton(
+                      tooltip: 'Guruhni tahrirlash',
+                      onPressed: () =>
+                          editStudyGroup(context, store, group: group),
+                      icon: const AppIcon('edit', size: 22),
+                    ),
+                  const Icon(Icons.chevron_right, color: AppColors.muted),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  _StatPill(
+                    icon: Icons.groups_outlined,
+                    label: '${store.studentsOf(group.id).length} o‘quvchi',
+                  ),
+                  _StatPill(
+                    icon: Icons.event_available_outlined,
+                    label: attendance == null
+                        ? 'Davomat —'
+                        : 'Davomat ${attendance.round()}%',
+                  ),
+                  _StatPill(
+                    icon: Icons.assignment_turned_in_outlined,
+                    label: homework == null
+                        ? 'Uy vazifa —'
+                        : 'Uy vazifa ${homework.round()}%',
+                  ),
+                  _StatPill(
+                    icon: Icons.emoji_events_outlined,
+                    label: '$coins coin',
+                    color: AppColors.primary,
                   ),
                 ],
               ),
-            ),
-            if (store.activeRole == AppRole.admin)
-              IconButton(
-                tooltip: 'Guruhni tahrirlash',
-                onPressed: () => editStudyGroup(context, store, group: group),
-                icon: const AppIcon('edit', size: 22),
-              ),
-            const Icon(Icons.chevron_right, color: AppColors.muted),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -163,4 +209,40 @@ class _GroupTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _StatPill extends StatelessWidget {
+  const _StatPill({
+    required this.icon,
+    required this.label,
+    this.color = AppColors.muted,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: .1),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: color),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
+    ),
+  );
 }
