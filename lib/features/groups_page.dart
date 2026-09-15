@@ -186,9 +186,9 @@ class _GroupTile extends StatelessWidget {
                         : 'Uy vazifa ${homework.round()}%',
                   ),
                   _StatPill(
-                    icon: Icons.emoji_events_outlined,
+                    icon: Icons.star_rounded,
                     label: '$points ball',
-                    color: AppColors.primary,
+                    color: AppColors.rewardGreen,
                   ),
                 ],
               ),

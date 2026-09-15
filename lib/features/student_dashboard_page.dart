@@ -38,8 +38,8 @@ class _StudentDashboardPageState extends State<StudentDashboardPage> {
       (
         '${store.pointsOf(store.activeUser.id)}',
         'Jami ballar',
-        Icons.monetization_on_outlined,
-        AppColors.warning,
+        Icons.star_rounded,
+        AppColors.rewardGreen,
         'Davomat uchun 10 ball va qabul qilingan vazifalar baholari',
       ),
       (

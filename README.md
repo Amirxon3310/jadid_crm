@@ -186,13 +186,15 @@ dars ballari (davomat + qabul qilingan vazifa), qo‘shimcha **rag‘bat** (yash
 `+`), qo‘shimcha **jarima** (qizil, `−`) va **jami**. Ro‘yxat jami ball bo‘yicha
 tartiblanadi. O‘quvchi ustiga bosilsa, unga berilgan barcha qo‘shimcha ballar
 tarixi ochiladi: kim berdi, qancha va qanday izoh bilan. Admin va shu guruh
-ustozi o‘sha oynadan yangi rag‘bat yoki jarima qo‘shadi; o‘quvchi faqat o‘z
+ustozi **Ball qo‘shish** oynasidan yangi ball beradi: son va izoh kiritiladi,
+son minus bilan yozilsa (masalan `-5`) jarima bo‘ladi va oyna buni saqlashdan
+oldin rangi bilan ko‘rsatadi. O‘quvchi faqat o‘z
 tarixini ko‘radi. Cheklovlar `score_awards` jadvalining RLS qoidalarida ham
 takrorlangan, jami ball esa serverdagi hisobga ham kiradi.
 
 Reyting o‘yin ko‘rinishida: 1–3 o‘rin toj bilan (oltin, kumush, bronza)
-belgilanadi, rag‘bat va jarima yorqin yashil/qizil nishonlarda, jami ball esa
-alohida ajratilgan. **Jamoa tuzish** tugmasi jadvalda belgilash imkonini
+belgilanadi. Ballar faqat ikki rangda: musbat — yashil, manfiy — qizil.
+**Jamoa tuzish** tugmasi jadvalda belgilash imkonini
 ochadi: bir nechta o‘quvchi tanlansa, ularning ballari qo‘shiladi va shu
 jamoa qolgan o‘quvchilar orasida nechanchi o‘rinda bo‘lishi ko‘rsatiladi
 (masalan “Abdulloh + Akbar — 145 ball, 2-o‘rinda bo‘lardi”). Bu faqat

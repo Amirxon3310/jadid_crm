@@ -253,16 +253,32 @@ void main() {
     expect(find.text('Dafter olib kelmadi'), findsOneWidget);
     expect(find.textContaining(store.activeUser.name), findsWidgets);
 
-    // And a new award can be added right there.
+    // A plain number rewards, from its own window.
+    await tester.tap(find.widgetWithText(FilledButton, 'Ball qo‘shish'));
+    await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextField, 'Ball'), '5');
+    await tester.pumpAndSettle();
+    expect(find.text('rag‘bat'), findsOneWidget);
     await tester.enterText(
       find.widgetWithText(TextField, 'Izoh'),
       'Uyga vazifani a’lo bajardi',
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Rag‘bat'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Saqlash'));
     await tester.pumpAndSettle();
     expect(store.bonusPointsOf('student-1'), 12);
     expect(find.text('Uyga vazifani a’lo bajardi'), findsOneWidget);
+
+    // The same window fines when the number carries a minus.
+    await tester.tap(find.widgetWithText(FilledButton, 'Ball qo‘shish'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Ball'), '-4');
+    await tester.pumpAndSettle();
+    expect(find.text('jarima'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Izoh'), 'Kechikdi');
+    await tester.tap(find.widgetWithText(FilledButton, 'Saqlash'));
+    await tester.pumpAndSettle();
+    expect(store.penaltyPointsOf('student-1'), -7);
+    expect(store.bonusPointsOf('student-1'), 12);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

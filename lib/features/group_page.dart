@@ -5,7 +5,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_theme.dart';
 import '../core/app_icon.dart';
-import '../core/app_notice.dart';
 import '../core/helpers.dart';
 import '../core/user_avatar.dart';
 import '../data/crm_store.dart';
@@ -1928,28 +1927,26 @@ class _RankBadge extends StatelessWidget {
   }
 }
 
-/// The running total, as the board's headline figure.
+/// The running total, as the board's headline figure: points are green when
+/// they are in the black and red when they are not — no other colour.
 class _TotalPoints extends StatelessWidget {
-  const _TotalPoints(this.value, {this.highlight = false});
+  const _TotalPoints(this.value);
   final int value;
-  final bool highlight;
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    decoration: BoxDecoration(
-      color: (highlight ? AppColors.gold : AppColors.primary).withValues(
-        alpha: .14,
+  Widget build(BuildContext context) {
+    final color = value < 0 ? AppColors.penaltyRed : AppColors.rewardGreen;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .14),
+        borderRadius: BorderRadius.circular(999),
       ),
-      borderRadius: BorderRadius.circular(999),
-    ),
-    child: Text(
-      '$value ball',
-      style: TextStyle(
-        color: highlight ? const Color(0xFFB07800) : AppColors.primary,
-        fontWeight: FontWeight.w800,
+      child: Text(
+        '$value ball',
+        style: TextStyle(color: color, fontWeight: FontWeight.w800),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _RankingTab extends StatefulWidget {
@@ -2119,12 +2116,7 @@ class _RankingTabState extends State<_RankingTab> {
                             DataCell(
                               _SignedPoints(store.penaltyPointsOf(student.id)),
                             ),
-                            DataCell(
-                              _TotalPoints(
-                                store.pointsOf(student.id),
-                                highlight: index == 0,
-                              ),
-                            ),
+                            DataCell(_TotalPoints(store.pointsOf(student.id))),
                           ],
                         ),
                     ],
@@ -2171,8 +2163,8 @@ class _TeamCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.rewardGreen.withValues(alpha: .16),
-            AppColors.primary.withValues(alpha: .14),
+            AppColors.rewardGreen.withValues(alpha: .18),
+            AppColors.rewardGreen.withValues(alpha: .06),
           ],
         ),
         borderRadius: BorderRadius.circular(18),
@@ -2227,7 +2219,7 @@ class _TeamCard extends StatelessWidget {
                   icon: Icons.leaderboard_rounded,
                   label: 'O‘rin',
                   value: '$rank',
-                  color: AppColors.primary,
+                  color: AppColors.ink,
                 ),
                 _TeamStat(
                   icon: Icons.group_rounded,
@@ -2300,14 +2292,8 @@ Future<void> _showAwardHistory(
   StudyGroup group,
   Student student,
 ) {
-  final amount = TextEditingController();
-  final note = TextEditingController();
-  return showFormDialog<void>(
+  return showDialog<void>(
     context: context,
-    onDisposed: () {
-      amount.dispose();
-      note.dispose();
-    },
     builder: (dialogContext) => AlertDialog(
       title: Text(student.name),
       content: SizedBox(
@@ -2316,26 +2302,6 @@ Future<void> _showAwardHistory(
           animation: store,
           builder: (context, _) {
             final awards = store.awardsOf(student.id);
-            Future<void> submit(int sign) async {
-              final value = int.tryParse(amount.text.trim()) ?? 0;
-              if (value <= 0) {
-                showAppNotice(context, 'Musbat ball kiriting.', isError: true);
-                return;
-              }
-              await runCrmAction(
-                context,
-                () => store.addScoreAward(
-                  studentId: student.id,
-                  groupId: group.id,
-                  amount: sign * value,
-                  note: note.text.trim(),
-                ),
-                success: 'Ball saqlandi',
-              );
-              amount.clear();
-              note.clear();
-            }
-
             return SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -2380,52 +2346,17 @@ Future<void> _showAwardHistory(
                     )
                   else if (store.canManageGroup(group.id)) ...[
                     const Divider(height: 26),
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 110,
-                          child: TextField(
-                            controller: amount,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Ball',
-                            ),
-                          ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.rewardGreen,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: note,
-                            decoration: const InputDecoration(
-                              labelText: 'Izoh',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: () => submit(1),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Rag‘bat'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.danger,
-                              padding: const EdgeInsets.symmetric(vertical: 18),
-                            ),
-                            onPressed: () => submit(-1),
-                            icon: const Icon(Icons.remove),
-                            label: const Text('Jarima'),
-                          ),
-                        ),
-                      ],
+                        onPressed: () =>
+                            showAddAward(context, store, group, student),
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('Ball qo‘shish'),
+                      ),
                     ),
                   ],
                 ],
@@ -2438,6 +2369,123 @@ Future<void> _showAwardHistory(
         TextButton(
           onPressed: () => Navigator.pop(dialogContext),
           child: const Text('Yopish'),
+        ),
+      ],
+    ),
+  );
+}
+
+/// One window for handing out points: the number carries its own sign, so a
+/// plain "10" rewards and a "-10" fines, and the preview says which as it is
+/// typed.
+Future<void> showAddAward(
+  BuildContext context,
+  CrmStore store,
+  StudyGroup group,
+  Student student,
+) {
+  final amount = TextEditingController();
+  final note = TextEditingController();
+  return showFormDialog<void>(
+    context: context,
+    onDisposed: () {
+      amount.dispose();
+      note.dispose();
+    },
+    builder: (dialogContext) => AlertDialog(
+      title: Text('${student.name} — ball qo‘shish'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: amount,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(
+                  signed: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Ball',
+                  hintText: 'Masalan: 10 yoki -5',
+                ),
+              ),
+              const SizedBox(height: 8),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: amount,
+                builder: (context, value, _) {
+                  final points = int.tryParse(value.text.trim());
+                  if (points == null || points == 0) {
+                    return const Text(
+                      'Minus bilan yozilsa jarima bo‘ladi.',
+                      style: TextStyle(fontSize: 12, color: AppColors.muted),
+                    );
+                  }
+                  return Row(
+                    children: [
+                      _SignedPoints(points),
+                      const SizedBox(width: 8),
+                      Text(
+                        points > 0 ? 'rag‘bat' : 'jarima',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: points > 0
+                              ? AppColors.rewardGreen
+                              : AppColors.penaltyRed,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: note,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Izoh',
+                  hintText: 'Nima uchun berilayotgani',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Bekor qilish'),
+        ),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: amount,
+          builder: (context, value, _) {
+            final points = int.tryParse(value.text.trim()) ?? 0;
+            return FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: points < 0
+                    ? AppColors.penaltyRed
+                    : AppColors.rewardGreen,
+              ),
+              onPressed: points == 0
+                  ? null
+                  : () async {
+                      Navigator.pop(dialogContext);
+                      await runCrmAction(
+                        context,
+                        () => store.addScoreAward(
+                          studentId: student.id,
+                          groupId: group.id,
+                          amount: points,
+                          note: note.text.trim(),
+                        ),
+                        success: 'Ball saqlandi',
+                      );
+                    },
+              child: const Text('Saqlash'),
+            );
+          },
         ),
       ],
     ),
