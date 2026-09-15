@@ -178,8 +178,15 @@ marta 10 ball beriladi (qayta saqlash ballarni takrorlamaydi). Ushbu o‘zgarish
 `supabase/migrations/20260916090000_lesson_window_and_homework_files.sql` va
 `supabase/migrations/20260916140000_score_awards.sql`
 orqali mavjud bazaga qo‘llanadi; yangi bazada `schema.sql` ichida allaqachon
-mavjud. `supabase/teacher_workspace_test.sql` begona guruhga yozish, selfisiz
+mavjud. Bu oltitasi ulangan loyihaga (2026-09-16) qo‘llandi.
+`supabase/teacher_workspace_test.sql` begona guruhga yozish, selfisiz
 yoki boshqa kundagi davomat, va ball takrorlanishini tranzaksiyada tekshiradi.
+
+Migratsiya qo‘llanmagan bazada ustun yoki jadval yo‘qligi sababli saqlash
+rad etiladi (davomat, guruh tahriri, uy vazifa). Qaysi biri yetishmayotganini
+bitta so‘rov bilan tekshirish mumkin: `to_regclass('public.score_awards')`,
+`attendance.arrived_at`, `groups.lesson_start_time`, `assignments.file_path`
+hamda `storage.buckets` ichidagi `homework-files` mavjudligiga qarang.
 
 **Reyting** bo‘limida har bir o‘quvchining ballari to‘rt ustunda ajratilgan:
 dars ballari (davomat + qabul qilingan vazifa), qo‘shimcha **rag‘bat** (yashil,
