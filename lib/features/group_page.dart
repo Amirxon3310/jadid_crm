@@ -668,22 +668,53 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                   final selected =
                       values[student.id] ??
                       widget.store.attendance[lesson.id]?[student.id];
-                  final choices = Wrap(
-                    spacing: 8,
+                  final came =
+                      selected == AttendanceStatus.present ||
+                      selected == AttendanceStatus.late;
+                  final late = selected == AttendanceStatus.late;
+                  final canEdit =
+                      widget.store.canMarkLesson(lesson) &&
+                      (student.active ||
+                          widget.store.activeRole == AppRole.admin);
+                  void setStatus(AttendanceStatus status) =>
+                      setState(() => values[student.id] = status);
+                  final control = Wrap(
+                    spacing: 10,
                     runSpacing: 8,
-                    children: AttendanceStatus.values.map((status) {
-                      return ChoiceChip(
-                        label: Text(_attendanceLabel(status)),
-                        selected: selected == status,
-                        onSelected:
-                            !widget.store.canMarkLesson(lesson) ||
-                                (!student.active &&
-                                    widget.store.activeRole != AppRole.admin)
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        came ? 'Keldi' : 'Kelmadi',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: _attendanceColor(selected),
+                        ),
+                      ),
+                      Switch(
+                        value: came,
+                        onChanged: !canEdit
                             ? null
-                            : (_) =>
-                                  setState(() => values[student.id] = status),
-                      );
-                    }).toList(),
+                            : (value) => setStatus(
+                                value
+                                    ? (late
+                                          ? AttendanceStatus.late
+                                          : AttendanceStatus.present)
+                                    : AttendanceStatus.absent,
+                              ),
+                      ),
+                      if (came)
+                        FilterChip(
+                          label: const Text('Kechikdi'),
+                          selected: late,
+                          onSelected: !canEdit
+                              ? null
+                              : (value) => setStatus(
+                                  value
+                                      ? AttendanceStatus.late
+                                      : AttendanceStatus.present,
+                                ),
+                        ),
+                    ],
                   );
                   if (constraints.maxWidth < 650) {
                     return Column(
@@ -691,14 +722,14 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                       children: [
                         Text(student.name),
                         const SizedBox(height: 8),
-                        choices,
+                        control,
                       ],
                     );
                   }
                   return Row(
                     children: [
                       Expanded(child: Text(student.name)),
-                      choices,
+                      control,
                     ],
                   );
                 },

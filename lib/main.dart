@@ -14,6 +14,7 @@ Future<void> main() async {
     url: AppConfig.supabaseUrl,
     publishableKey: AppConfig.supabasePublishableKey,
   );
+  await loadSavedThemeMode();
   runApp(const CrmApp());
 }
 

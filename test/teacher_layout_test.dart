@@ -91,10 +91,10 @@ void main() {
         expect(tester.takeException(), isNull, reason: label);
         if (label == 'Davomat') {
           expect(find.text('Suratga tushish'), findsOneWidget);
-          final chip = tester
-              .widgetList<ChoiceChip>(find.byType(ChoiceChip))
+          final switcher = tester
+              .widgetList<Switch>(find.byType(Switch))
               .first;
-          expect(chip.onSelected, isNull);
+          expect(switcher.onChanged, isNull);
         }
         if (label == 'Uy vazifalari') {
           await tester.tap(find.text('Vazifa berish'));

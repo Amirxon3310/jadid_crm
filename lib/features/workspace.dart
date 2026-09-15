@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/app_icon.dart';
@@ -80,8 +81,9 @@ class _WorkspaceState extends State<Workspace> {
         actions: [
           IconButton(
             tooltip: dark ? 'Yorug‘ rejim' : 'Tungi rejim',
-            onPressed: () =>
-                appThemeMode.value = dark ? ThemeMode.light : ThemeMode.dark,
+            onPressed: () => unawaited(
+              setThemeMode(dark ? ThemeMode.light : ThemeMode.dark),
+            ),
             icon: Icon(
               dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
               size: 34,

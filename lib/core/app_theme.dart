@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 abstract final class AppColors {
   static const primary = Color(0xFF279EFA);
@@ -21,6 +22,24 @@ abstract final class AppColors {
 }
 
 final appThemeMode = ValueNotifier<ThemeMode>(ThemeMode.light);
+const _themeModeKey = 'theme_mode';
+
+/// Restores the device's last saved dark/light choice. Call once before
+/// `runApp` so the first frame already renders in the remembered mode.
+Future<void> loadSavedThemeMode() async {
+  final prefs = await SharedPreferences.getInstance();
+  if (prefs.getString(_themeModeKey) == 'dark') {
+    appThemeMode.value = ThemeMode.dark;
+  }
+}
+
+/// Switches the theme and remembers the choice on this device (browser
+/// localStorage on web, platform prefs elsewhere) so it survives a reload.
+Future<void> setThemeMode(ThemeMode mode) async {
+  appThemeMode.value = mode;
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString(_themeModeKey, mode == ThemeMode.dark ? 'dark' : 'light');
+}
 
 ThemeData buildTheme({Brightness brightness = Brightness.light}) => ThemeData(
   useMaterial3: true,
