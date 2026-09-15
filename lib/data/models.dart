@@ -294,6 +294,7 @@ class ScoreAward {
     required this.byName,
     required this.createdAt,
     this.groupId,
+    this.byRole,
   });
 
   final String id;
@@ -302,6 +303,8 @@ class ScoreAward {
   final int amount;
   final String note;
   final String byName;
+  // Who handed it out, so the history can say "Amirxon • Admin".
+  final AppRole? byRole;
   final DateTime createdAt;
   bool get isBonus => amount > 0;
 }

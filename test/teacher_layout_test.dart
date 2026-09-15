@@ -357,6 +357,42 @@ void main() {
     );
     expect(inDialog('-1000'), findsOneWidget);
     expect(inDialog('+1000'), findsOneWidget);
+
+    // The reason leads the row, in bold, or says there wasn't one.
+    final reason = tester.widget<Text>(
+      inDialog('Juda uzun izoh: viloyat olimpiadasida birinchi o‘rin'),
+    );
+    expect(reason.style?.fontWeight, FontWeight.w700);
+    expect(inDialog('Izohsiz'), findsOneWidget);
+
+    // Under it: who gave it and what they are, then the centre's clock.
+    final now = tashkentDate(DateTime.now());
+    const months = [
+      'yanvar',
+      'fevral',
+      'mart',
+      'aprel',
+      'may',
+      'iyun',
+      'iyul',
+      'avgust',
+      'sentabr',
+      'oktabr',
+      'noyabr',
+      'dekabr',
+    ];
+    final byLine = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.textContaining('${store.activeUser.name} • Admin'),
+    );
+    expect(byLine, findsWidgets);
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.textContaining('${now.day}-${months[now.month - 1]} '),
+      ),
+      findsWidgets,
+    );
     // A RenderFlex overflow would surface here.
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());

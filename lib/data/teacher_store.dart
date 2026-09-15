@@ -113,6 +113,7 @@ extension TeacherStore on CrmStore {
     // applied yet simply has no awards — the rest of the app still loads.
     _scoreAwardsReady = true;
     final memberName = {for (final u in users) u.membershipId: u.name};
+    final memberRole = {for (final u in users) u.membershipId: u.role};
     final memberUser = {for (final u in users) u.membershipId: u.id};
     try {
       for (final row in await client!.from('score_awards').select()) {
@@ -126,6 +127,7 @@ extension TeacherStore on CrmStore {
             amount: (row['amount'] as num).toInt(),
             note: row['note']?.toString() ?? '',
             byName: memberName[row['created_by'].toString()] ?? 'Xodim',
+            byRole: memberRole[row['created_by'].toString()],
             createdAt: DateTime.parse(row['created_at'].toString()).toLocal(),
           ),
         );
@@ -239,6 +241,7 @@ extension TeacherStore on CrmStore {
           amount: amount,
           note: note,
           byName: actor.name,
+          byRole: actor.role,
           createdAt: DateTime.now(),
         ),
       ),
@@ -263,6 +266,7 @@ extension TeacherStore on CrmStore {
           amount: (row['amount'] as num).toInt(),
           note: row['note']?.toString() ?? '',
           byName: actor.name,
+          byRole: actor.role,
           createdAt: DateTime.parse(row['created_at'].toString()).toLocal(),
         );
         _ids[temp] = row['id'].toString();

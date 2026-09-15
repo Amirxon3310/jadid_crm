@@ -1251,21 +1251,36 @@ class _TeacherHomework extends StatelessWidget {
 }
 
 const _uzMonths = [
-  'Yanvar',
-  'Fevral',
-  'Mart',
-  'Aprel',
-  'May',
-  'Iyun',
-  'Iyul',
-  'Avgust',
-  'Sentyabr',
-  'Oktyabr',
-  'Noyabr',
-  'Dekabr',
+  'yanvar',
+  'fevral',
+  'mart',
+  'aprel',
+  'may',
+  'iyun',
+  'iyul',
+  'avgust',
+  'sentabr',
+  'oktabr',
+  'noyabr',
+  'dekabr',
 ];
-String _monthLabel(DateTime month) =>
-    '${_uzMonths[month.month - 1]} ${month.year}';
+String _monthLabel(DateTime month) {
+  final name = _uzMonths[month.month - 1];
+  return '${name[0].toUpperCase()}${name.substring(1)} ${month.year}';
+}
+
+/// Who handed the points out: the name, and what they are in the centre.
+String _giverLabel(ScoreAward award) => switch (award.byRole) {
+  AppRole.admin => '${award.byName} • Admin',
+  AppRole.teacher => '${award.byName} • Ustoz',
+  _ => award.byName,
+};
+
+/// "15-sentabr 20:21" — the centre's own clock, whatever the device's is.
+String _dayTimeLabel(DateTime instant) {
+  final local = tashkentDate(instant);
+  return '${local.day}-${_uzMonths[local.month - 1]} ${_hhmm(local)}';
+}
 
 /// Blue = submitted, green = accepted, red = not sent or returned — the
 /// journal's own reading of homework status, distinct from the muted/warning
@@ -2371,9 +2386,29 @@ Future<void> _showAwardHistory(
                           children: [_SignedPoints(award.amount)],
                         ),
                       ),
-                      title: Text(award.note.isEmpty ? '—' : award.note),
-                      subtitle: Text(
-                        '${award.byName} • ${shortDate(award.createdAt)}',
+                      title: Text(
+                        award.note.isEmpty ? 'Izohsiz' : award.note,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: award.note.isEmpty ? AppColors.muted : null,
+                        ),
+                      ),
+                      subtitle: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: _giverLabel(award),
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            TextSpan(
+                              text: '   ${_dayTimeLabel(award.createdAt)}',
+                              style: const TextStyle(color: AppColors.muted),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   if (store.canManageGroup(group.id)) ...[
