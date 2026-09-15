@@ -4,6 +4,22 @@ part of 'crm_store.dart';
 DateTime tashkentDate(DateTime time) =>
     time.toUtc().add(const Duration(hours: 5));
 
+/// The inverse of [tashkentDate]: a real instant for a given Tashkent
+/// wall-clock date and time, regardless of the device's own time zone.
+DateTime tashkentInstant(int year, int month, int day, int hour, int minute) =>
+    DateTime.utc(
+      year,
+      month,
+      day,
+      hour,
+      minute,
+    ).subtract(const Duration(hours: 5));
+
+int _minutesOfDay(String hhmm) {
+  final parts = hhmm.split(':');
+  return int.parse(parts[0]) * 60 + int.parse(parts[1]);
+}
+
 extension TeacherStore on CrmStore {
   void startLiveUpdates() {
     if (!isOnline || !enableLiveUpdates || _liveChannel != null) return;
@@ -243,6 +259,12 @@ extension TeacherStore on CrmStore {
     'room': group.room,
     'status': group.status,
     'week_days': group.weekDays,
+    'lesson_start_time': group.lessonStartTime.isEmpty
+        ? null
+        : group.lessonStartTime,
+    'lesson_end_time': group.lessonEndTime.isEmpty
+        ? null
+        : group.lessonEndTime,
   };
 
   Future<void> updateGroup(StudyGroup group) async {
@@ -306,6 +328,20 @@ extension TeacherStore on CrmStore {
       )
       .firstOrNull;
 
+  /// Whether `now` falls within the group's scheduled lesson day and time
+  /// (when a lesson_start_time/lesson_end_time pair is not set, the day
+  /// check still applies but there is no time-of-day restriction).
+  bool isScheduledNow(StudyGroup group, {DateTime? now}) {
+    final today = tashkentDate(now ?? DateTime.now());
+    if (group.weekDays.isNotEmpty && !group.weekDays.contains(today.weekday))
+      return false;
+    if (group.lessonStartTime.isEmpty || group.lessonEndTime.isEmpty)
+      return true;
+    final minutesNow = today.hour * 60 + today.minute;
+    return minutesNow >= _minutesOfDay(group.lessonStartTime) &&
+        minutesNow <= _minutesOfDay(group.lessonEndTime);
+  }
+
   bool isCheckinDay(Lesson lesson, {DateTime? now}) {
     final group = groupById(lesson.groupId);
     final day = tashkentDate(lesson.startsAt),
@@ -317,7 +353,7 @@ extension TeacherStore on CrmStore {
         day.year == today.year &&
         day.month == today.month &&
         day.day == today.day &&
-        (group.weekDays.isEmpty || group.weekDays.contains(day.weekday));
+        isScheduledNow(group, now: now);
   }
 
   bool canMarkLesson(Lesson lesson) =>

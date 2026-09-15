@@ -379,6 +379,8 @@ class CrmStore extends ChangeNotifier {
             room: row['room'].toString(),
             status: row['status'] as String? ?? 'active',
             weekDays: List<int>.from(row['week_days'] as List? ?? []),
+            lessonStartTime: _shortTime(row['lesson_start_time'] as String?),
+            lessonEndTime: _shortTime(row['lesson_end_time'] as String?),
           );
         }),
       );
@@ -605,9 +607,17 @@ class CrmStore extends ChangeNotifier {
     String description,
     DateTime dueDate, {
     String? lessonId,
+    Uint8List? fileBytes,
+    String? fileName,
   }) async {
     final temp = _newId();
     final actor = activeUser;
+    // A string-based path is safe even if the group itself is still
+    // pending; it is recomputed with the resolved server id inside `send`.
+    var path = fileBytes == null
+        ? null
+        : '${groupById(groupId).organizationId}/${resolveId(groupId)}'
+              '/${DateTime.now().microsecondsSinceEpoch}_$fileName';
     await _mutate<Map<String, dynamic>>(
       apply: () {
         final group = groupById(groupId);
@@ -628,22 +638,48 @@ class CrmStore extends ChangeNotifier {
             description: description,
             dueDate: dueDate,
             lessonId: lessonId == null ? null : resolveId(lessonId),
+            filePath: path,
+            fileName: fileName,
           ),
         );
       },
-      send: () => client!
-          .from('assignments')
-          .insert({
-            'organization_id': groupById(groupId).organizationId,
-            'group_id': _serverId(groupId),
-            'title': title,
-            'description': description,
-            'due_at': dueDate.toUtc().toIso8601String(),
-            'lesson_id': lessonId == null ? null : _serverId(lessonId),
-            'created_by': int.parse(actor.membershipId),
-          })
-          .select()
-          .single(),
+      send: () async {
+        if (path != null) {
+          path =
+              '${groupById(groupId).organizationId}/${_serverId(groupId)}'
+              '/${DateTime.now().microsecondsSinceEpoch}_$fileName';
+          await client!.storage
+              .from('homework-files')
+              .uploadBinary(path!, fileBytes!);
+        }
+        try {
+          return await client!
+              .from('assignments')
+              .insert({
+                'organization_id': groupById(groupId).organizationId,
+                'group_id': _serverId(groupId),
+                'title': title,
+                'description': description,
+                'due_at': dueDate.toUtc().toIso8601String(),
+                'lesson_id': lessonId == null ? null : _serverId(lessonId),
+                'created_by': int.parse(actor.membershipId),
+                'file_path': path,
+                'file_name': fileName,
+              })
+              .select()
+              .single();
+        } catch (_) {
+          if (path != null) {
+            unawaited(
+              client!.storage
+                  .from('homework-files')
+                  .remove([path!])
+                  .then<void>((_) {}, onError: (Object _) {}),
+            );
+          }
+          rethrow;
+        }
+      },
       reconcile: (row) {
         homeworks[homeworks.indexWhere((h) => h.id == temp)] = Homework(
           id: row['id'].toString(),
@@ -652,11 +688,16 @@ class CrmStore extends ChangeNotifier {
           description: row['description'].toString(),
           dueDate: DateTime.parse(row['due_at'].toString()).toLocal(),
           lessonId: row['lesson_id']?.toString(),
+          filePath: row['file_path'] as String?,
+          fileName: row['file_name'] as String?,
         );
         _ids[temp] = row['id'].toString();
       },
     );
   }
+
+  Future<String> homeworkFileUrl(String path) async =>
+      client!.storage.from('homework-files').createSignedUrl(path, 300);
 
   Future<void> submitHomework(
     String homeworkId,
@@ -751,6 +792,8 @@ class CrmStore extends ChangeNotifier {
     required String room,
     List<int> weekDays = const [],
     String status = 'active',
+    String lessonStartTime = '',
+    String lessonEndTime = '',
   }) async {
     if (activeRole != AppRole.admin) throw StateError('Admin huquqi kerak.');
     final temp = _newId();
@@ -766,6 +809,8 @@ class CrmStore extends ChangeNotifier {
       organizationId: activeUser.organizationId,
       weekDays: List.unmodifiable(weekDays),
       status: status,
+      lessonStartTime: lessonStartTime,
+      lessonEndTime: lessonEndTime,
     );
     await _mutate<Map<String, dynamic>>(
       apply: () => groups.add(group),
@@ -1062,6 +1107,9 @@ class CrmStore extends ChangeNotifier {
       AttendanceStatus.values.firstWhere((item) => item.name == value);
   static HomeworkStatus _homework(String value) =>
       HomeworkStatus.values.firstWhere((item) => item.name == value);
+  // Postgres `time` comes back as "HH:mm:ss"; keep just "HH:mm" client-side.
+  static String _shortTime(String? value) =>
+      value == null ? '' : value.substring(0, 5);
   static DateTime _today(int hour) {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day, hour);

@@ -3,6 +3,16 @@ import '../core/helpers.dart';
 import '../data/crm_store.dart';
 import '../data/models.dart';
 
+String _formatTimeOfDay(TimeOfDay time) =>
+    '${time.hour.toString().padLeft(2, '0')}:'
+    '${time.minute.toString().padLeft(2, '0')}';
+
+TimeOfDay? _parseTime(String value) {
+  if (value.isEmpty) return null;
+  final parts = value.split(':');
+  return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+}
+
 Future<void> editStudyGroup(
   BuildContext context,
   CrmStore store, {
@@ -11,10 +21,11 @@ Future<void> editStudyGroup(
   if (store.activeRole != AppRole.admin) return;
   final name = TextEditingController(text: group?.name);
   final course = TextEditingController(text: group?.course);
-  final schedule = TextEditingController(text: group?.schedule);
   final room = TextEditingController(text: group?.room);
   String teacherId = group?.teacherId ?? '';
   String status = group?.status ?? 'active';
+  String lessonStartTime = group?.lessonStartTime ?? '';
+  String lessonEndTime = group?.lessonEndTime ?? '';
   final days = <int>{...?group?.weekDays};
   final form = GlobalKey<FormState>();
   final staff = store.users
@@ -25,7 +36,6 @@ Future<void> editStudyGroup(
     onDisposed: () {
       name.dispose();
       course.dispose();
-      schedule.dispose();
       room.dispose();
     },
     builder: (dialogContext) => StatefulBuilder(
@@ -112,13 +122,55 @@ Future<void> editStudyGroup(
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: schedule,
-                    decoration: const InputDecoration(
-                      labelText: 'Dars vaqti / jadval',
-                      hintText: '15:00–16:30',
-                    ),
+                  const SizedBox(height: 18),
+                  const Text('Dars vaqti'),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime:
+                                  _parseTime(lessonStartTime) ??
+                                  const TimeOfDay(hour: 15, minute: 0),
+                            );
+                            if (picked == null) return;
+                            update(
+                              () => lessonStartTime = _formatTimeOfDay(picked),
+                            );
+                          },
+                          child: Text(
+                            lessonStartTime.isEmpty
+                                ? 'Boshlanish vaqti'
+                                : 'Boshlanish: $lessonStartTime',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime:
+                                  _parseTime(lessonEndTime) ??
+                                  const TimeOfDay(hour: 16, minute: 30),
+                            );
+                            if (picked == null) return;
+                            update(
+                              () => lessonEndTime = _formatTimeOfDay(picked),
+                            );
+                          },
+                          child: Text(
+                            lessonEndTime.isEmpty
+                                ? 'Tugash vaqti'
+                                : 'Tugash: $lessonEndTime',
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 14),
                   TextField(
@@ -151,8 +203,10 @@ Future<void> editStudyGroup(
   final weekDays = days.toList()..sort();
   final groupName = name.text.trim(),
       groupCourse = course.text.trim(),
-      groupSchedule = schedule.text.trim(),
-      groupRoom = room.text.trim();
+      groupRoom = room.text.trim(),
+      groupSchedule = lessonStartTime.isEmpty || lessonEndTime.isEmpty
+          ? ''
+          : '$lessonStartTime–$lessonEndTime';
   await runCrmAction(
     context,
     () => group == null
@@ -164,6 +218,8 @@ Future<void> editStudyGroup(
             room: groupRoom,
             weekDays: weekDays,
             status: status,
+            lessonStartTime: lessonStartTime,
+            lessonEndTime: lessonEndTime,
           )
         : store.updateGroup(
             group.copyWith(
@@ -176,6 +232,8 @@ Future<void> editStudyGroup(
               room: groupRoom,
               weekDays: weekDays,
               status: status,
+              lessonStartTime: lessonStartTime,
+              lessonEndTime: lessonEndTime,
             ),
           ),
   );

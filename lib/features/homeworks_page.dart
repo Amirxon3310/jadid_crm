@@ -65,7 +65,7 @@ class HomeworksPage extends StatelessWidget {
                     context,
                     MaterialPageRoute<void>(
                       builder: (_) =>
-                          GroupPage(store: store, group: group, startTab: 3),
+                          GroupPage(store: store, group: group, startTab: 2),
                     ),
                   ),
                 );

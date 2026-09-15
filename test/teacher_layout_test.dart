@@ -78,7 +78,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       for (final label in [
-        'Jadval',
         'Davomat',
         'Uy vazifalari',
         'Jurnal',
@@ -100,7 +99,7 @@ void main() {
           await tester.tap(find.text('Vazifa berish'));
           await tester.pumpAndSettle();
           await tester.enterText(
-            find.widgetWithText(TextField, 'Vazifa nomi'),
+            find.widgetWithText(TextField, 'Vazifa (nima qilish kerak)'),
             'New linked task',
           );
           await tester.tap(find.text('Berish'));

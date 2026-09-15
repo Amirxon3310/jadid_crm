@@ -55,7 +55,7 @@ alohida tayinlashi kerak. Ustozga guruhni admin biriktiradi.
 - Admin: foydalanuvchilar, rollar, guruhlar va biriktirishlar.
 - Ustoz: o‘z guruhlari, dars qo‘shish, davomat, vazifa berish va tekshirish.
 - O‘quvchi: o‘z guruhi, davomat, vazifa va javob yuborish.
-- Guruh ichida: ma’lumot, jadval, davomat, uy vazifalari va jurnal.
+- Guruh ichida: ma’lumot, davomat, uy vazifalari, jurnal va reyting.
 - Ma’lumotlar Supabase PostgreSQL’da saqlanadi; sahifa yangilanganda yo‘qolmaydi.
 
 ## Kod tuzilishi
@@ -149,25 +149,41 @@ Admin **Guruhlar**da yangi guruh ochadi; ustozni darhol yoki keyinroq biriktirad
 Ustoz dashboardida faqat o‘ziga biriktirilgan guruhlar bo‘yicha statistika chiqadi:
 jami guruhlar, jami o‘quvchilar, ketgan o‘quvchilar va bitirgan o‘quvchilar foizi
 (bitirganlar / jami o‘quvchilar × 100). Har bir guruh kartasida holati, davomat,
-uy vazifa bajarilishi va o‘quvchilar reytingi ko‘rinadi. Admin yoki shu guruh ustozi
-o‘quvchini **Aktiv / Ketgan / Tugatgan** deb belgilaydi; bu holat guruh faol bo‘lishidan
-qat’i nazar o‘quvchining shu guruhdagi tarixida saqlanadi.
+uy vazifa bajarilishi va o‘quvchilar reytingi ko‘rinadi. **Faqat admin**
+o‘quvchini **Aktiv / Ketgan / Tugatgan** deb belgilaydi (tugma qatori orqali,
+dropdown emas); guruhning o‘z ustozi bu holatni o‘zgartira olmaydi, faqat
+ko‘radi. Bu holat guruh faol bo‘lishidan qat’i nazar o‘quvchining shu guruhdagi
+tarixida saqlanadi. Cheklov serverda `set_enrollment_status` orqali ham
+tekshiriladi.
 
-Suratli davomat: ustoz avval guruh uchun belgilangan dars kunida o‘zini kamerada
-suratga oladi (brauzerda `getUserMedia`, mobil/ilovada qurilma kamerasi orqali),
-shundan keyingina shu darsga davomat belgilash ochiladi. Surat har dars uchun bitta
-marta olinadi va faqat shu guruh xodimlariga ko‘rinadi; sana va guruh boshqa
-bo‘lsa server ham rad etadi. Dars mavzusini ustoz o‘zi kiritadi va shu darsga
-bog‘langan uy vazifasini beradi; o‘quvchi javob yuboradi, ustoz tekshiradi va
-o‘tilgan darslarni ko‘rishda davom etadi.
+Guruhda haftalik dars kunlaridan tashqari kunlik dars vaqti (boshlanish/tugash)
+ham belgilanadi. **Davomat** bo‘limida alohida jadval yo‘q: shu kun va shu vaqt
+oralig‘ida ustoz avval o‘zini kamerada suratga oladi (brauzerda `getUserMedia`,
+mobil/ilovada qurilma kamerasi orqali), so‘ng bugungi dars nomini kiritib
+darsni boshlaydi va o‘quvchilarni **Keldi/Kelmadi** svicheri bilan belgilaydi;
+kelgan deb belgilansa kelish vaqti darsning boshlanish vaqtiga qarab avtomatik
+qo‘yiladi, ustoz xohlasa vaqtni qo‘lda o‘zgartiradi. Dars vaqtidan tashqarida
+ustoz davomat qila olmaydi — faqat admin istalgan vaqtda amalga oshiradi. Surat
+har dars uchun bitta marta olinadi va faqat shu guruh xodimlariga ko‘rinadi;
+sana, vaqt oralig‘i va guruh boshqa bo‘lsa server ham rad etadi. Uy vazifasi
+shu darsga bog‘lanadi; o‘quvchi javob yuboradi, ustoz tekshiradi va o‘tilgan
+darslarni ko‘rishda davom etadi.
 
 **Qatnashdi** yoki **Kechikdi** deb belgilangan har bir dars uchun o‘quvchiga bir
 marta 10 coin beriladi (qayta saqlash coinlarni takrorlamaydi). Ushbu o‘zgarishlar
-`supabase/migrations/20260914175803_teacher_workspace.sql` va
-`supabase/migrations/20260914234429_group_creation_visibility.sql` orqali mavjud
-bazaga qo‘llanadi; yangi bazada `schema.sql` ichida allaqachon mavjud.
-`supabase/teacher_workspace_test.sql` begona guruhga yozish, selfisiz yoki boshqa
-kundagi davomat, va coin takrorlanishini tranzaksiyada tekshiradi.
+`supabase/migrations/20260914175803_teacher_workspace.sql`,
+`supabase/migrations/20260914234429_group_creation_visibility.sql`,
+`supabase/migrations/20260915063000_enrollment_status_admin_only.sql`,
+`supabase/migrations/20260916070000_attendance_arrival_time.sql` va
+`supabase/migrations/20260916090000_lesson_window_and_homework_files.sql`
+orqali mavjud bazaga qo‘llanadi; yangi bazada `schema.sql` ichida allaqachon
+mavjud. `supabase/teacher_workspace_test.sql` begona guruhga yozish, selfisiz
+yoki boshqa kundagi davomat, va coin takrorlanishini tranzaksiyada tekshiradi.
+
+Uy vazifasi bitta “Vazifa” maydoni bilan beriladi (alohida “tushuntirish”
+maydoni yo‘q) va ixtiyoriy fayl biriktiriladi (`homework-files` yopiq
+bucketida saqlanadi, faqat shu guruh xodimlari va o‘quvchilari ko‘radi).
+Muddat sukut bo‘yicha 1 haftadan keyin; ustoz xohlasa sanani o‘zgartiradi.
 
 ## O‘quvchi kabineti
 

@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_theme.dart';
 import '../core/app_icon.dart';
@@ -77,17 +80,9 @@ class _GroupPageState extends State<GroupPage> {
           ),
         ),
       );
-    const labels = [
-      'Ma’lumot',
-      'Jadval',
-      'Davomat',
-      'Uy vazifalari',
-      'Jurnal',
-      'Reyting',
-    ];
+    const labels = ['Ma’lumot', 'Davomat', 'Uy vazifalari', 'Jurnal', 'Reyting'];
     final pages = [
       _InfoTab(store: widget.store, group: group),
-      _ScheduleTab(store: widget.store, group: group),
       _AttendanceTab(store: widget.store, group: group),
       _HomeworkTab(store: widget.store, group: group),
       _JournalTab(store: widget.store, group: group),
@@ -410,173 +405,6 @@ class _Detail extends StatelessWidget {
   );
 }
 
-class _ScheduleTab extends StatelessWidget {
-  const _ScheduleTab({required this.store, required this.group});
-
-  final CrmStore store;
-  final StudyGroup group;
-
-  @override
-  Widget build(BuildContext context) {
-    final lessons = store.lessonsOf(group.id);
-    return Surface(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Dars jadvali',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-                ),
-              ),
-              if (store.canManageGroup(group.id) && group.active)
-                FilledButton.icon(
-                  onPressed: () => _addLesson(context),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Dars qo‘shish'),
-                ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          Text(group.schedule, style: const TextStyle(color: AppColors.muted)),
-          const SizedBox(height: 20),
-          for (final lesson in lessons)
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(vertical: 5),
-              leading: CircleAvatar(
-                backgroundColor: AppColors.softBlue(context),
-                child: const Icon(
-                  Icons.calendar_today_outlined,
-                  color: AppColors.primary,
-                ),
-              ),
-              title: Text(
-                lesson.topic,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(
-                '${shortDate(lesson.startsAt)} • ${shortTime(lesson.startsAt)}',
-              ),
-              trailing: PopupMenuButton<String>(
-                enabled: store.canManageGroup(group.id),
-                tooltip: 'Dars holati',
-                initialValue: lesson.status,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                onSelected: (value) => runCrmAction(
-                  context,
-                  () => store.setLessonStatus(lesson.id, value),
-                ),
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'planned', child: Text('Rejada')),
-                  PopupMenuItem(value: 'completed', child: Text('O‘tilgan')),
-                  PopupMenuItem(
-                    value: 'cancelled',
-                    child: Text('Bekor qilingan'),
-                  ),
-                ],
-                child: Chip(
-                  label: Text(switch (lesson.status) {
-                    'completed' => 'O‘tilgan',
-                    'cancelled' => 'Bekor qilingan',
-                    _ => 'Rejada',
-                  }),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _addLesson(BuildContext context) async {
-    final topic = TextEditingController();
-    DateTime startsAt = DateTime.now();
-    while (group.weekDays.isNotEmpty &&
-        !group.weekDays.contains(tashkentDate(startsAt).weekday)) {
-      startsAt = startsAt.add(const Duration(days: 1));
-    }
-    final saved = await showFormDialog<bool>(
-      context: context,
-      onDisposed: topic.dispose,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            title: const Text('Yangi dars'),
-            content: SizedBox(
-              width: 440,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: topic,
-                    decoration: const InputDecoration(
-                      labelText: 'Dars mavzusi',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.event_outlined),
-                    title: Text(
-                      '${shortDate(startsAt)} • ${shortTime(startsAt)}',
-                    ),
-                    onTap: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        firstDate: DateTime.now().subtract(
-                          const Duration(days: 30),
-                        ),
-                        lastDate: DateTime.now().add(const Duration(days: 730)),
-                        initialDate: startsAt,
-                      );
-                      if (date == null || !context.mounted) return;
-                      final time = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.fromDateTime(startsAt),
-                      );
-                      if (time == null) return;
-                      setDialogState(
-                        () => startsAt = DateTime(
-                          date.year,
-                          date.month,
-                          date.day,
-                          time.hour,
-                          time.minute,
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Bekor qilish'),
-              ),
-              FilledButton(
-                onPressed: () => topic.text.trim().isEmpty
-                    ? null
-                    : Navigator.pop(context, true),
-                child: const Text('Saqlash'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-    if (saved == true && context.mounted)
-      await runCrmAction(
-        context,
-        () => store.addLesson(group.id, topic.text.trim(), startsAt),
-      );
-  }
-}
-
 class _AttendanceTab extends StatefulWidget {
   const _AttendanceTab({required this.store, required this.group});
 
@@ -588,77 +416,45 @@ class _AttendanceTab extends StatefulWidget {
 }
 
 class _AttendanceTabState extends State<_AttendanceTab> {
-  String? lessonId;
   Map<String, AttendanceStatus> values = {};
   Map<String, String> times = {};
+  final topic = TextEditingController();
+
+  @override
+  void dispose() {
+    topic.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final lessons = widget.store.lessonsOf(widget.group.id);
-    if (lessons.isEmpty)
-      return const Surface(
-        child: EmptyState(text: 'Darslar hali yaratilmagan'),
-      );
-    lessonId = widget.store.resolveId(
-      lessonId ??
-          (lessons.where((l) => widget.store.isCheckinDay(l)).firstOrNull ??
-                  lessons.first)
-              .id,
-    );
-    if (!lessons.any((lesson) => lesson.id == lessonId)) {
-      lessonId = lessons.first.id;
-      values.clear();
-      times.clear();
-    }
-    final lesson = lessons.firstWhere((item) => item.id == lessonId);
-    final students = _visibleStudents(widget.store, widget.group.id);
+    final group = widget.group;
+    final today = tashkentDate(DateTime.now());
+    final lesson = widget.store.lessonsOf(group.id).where((l) {
+      final day = tashkentDate(l.startsAt);
+      return day.year == today.year &&
+          day.month == today.month &&
+          day.day == today.day;
+    }).firstOrNull;
 
+    if (lesson == null) return _buildStartLesson(context, group, today);
+
+    final students = _visibleStudents(widget.store, group.id);
     return Surface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final picker = SizedBox(
-                width: 260,
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey(lessonId),
-                  initialValue: lessonId,
-                  decoration: const InputDecoration(
-                    labelText: 'Darsni tanlang',
-                  ),
-                  items: lessons.map((item) {
-                    return DropdownMenuItem(
-                      value: item.id,
-                      child: Text(
-                        '${shortDate(item.startsAt)} • ${item.topic}',
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (id) => setState(() {
-                    lessonId = id;
-                    values.clear();
-                    times.clear();
-                  }),
-                ),
-              );
-              const title = Text(
-                'Davomat',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-              );
-              if (constraints.maxWidth < 600) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [title, const SizedBox(height: 12), picker],
-                );
-              }
-              return Row(
-                children: [
-                  Expanded(child: title),
-                  picker,
-                ],
-              );
-            },
+          const Text(
+            'Davomat',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            lesson.topic,
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 20),
           if (widget.store.activeRole != AppRole.student)
@@ -700,13 +496,22 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                         value: came,
                         onChanged: !canEdit
                             ? null
-                            : (value) => setStatus(
-                                value
+                            : (value) => setState(() {
+                                values[student.id] = value
                                     ? (late
                                           ? AttendanceStatus.late
                                           : AttendanceStatus.present)
-                                    : AttendanceStatus.absent,
-                              ),
+                                    : AttendanceStatus.absent;
+                                // Default the arrival time to the lesson's
+                                // own start time; a teacher may still adjust
+                                // it below.
+                                if (value && arrivedAt == null) {
+                                  final start = tashkentDate(lesson.startsAt);
+                                  times[student.id] =
+                                      '${start.hour.toString().padLeft(2, '0')}:'
+                                      '${start.minute.toString().padLeft(2, '0')}';
+                                }
+                              }),
                       ),
                       if (came)
                         FilterChip(
@@ -798,6 +603,86 @@ class _AttendanceTabState extends State<_AttendanceTab> {
       ),
     );
   }
+
+  /// No lesson exists for today yet. A teacher may start one (topic only)
+  /// while the group's scheduled day/time window is open; admin may do it
+  /// any time. Everyone else just sees why attendance isn't open.
+  Widget _buildStartLesson(
+    BuildContext context,
+    StudyGroup group,
+    DateTime today,
+  ) {
+    final isAdmin = widget.store.activeRole == AppRole.admin;
+    final isTeacher =
+        widget.store.activeRole == AppRole.teacher &&
+        widget.store.canManageGroup(group.id);
+    final scheduledNow = widget.store.isScheduledNow(group, now: today);
+    final canStart = group.active && (isAdmin || (isTeacher && scheduledNow));
+    if (!canStart) {
+      final message = !group.active
+          ? 'Guruh faol emas.'
+          : isTeacher
+          ? _scheduleUnavailableReason(group, today)
+          : 'Bugungi dars hali boshlanmagan.';
+      return Surface(
+        child: EmptyState(text: message, icon: Icons.schedule_outlined),
+      );
+    }
+    return Surface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Davomat',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            'Bugungi darsni boshlash uchun mavzusini kiriting.',
+            style: TextStyle(color: AppColors.muted),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: topic,
+            decoration: const InputDecoration(labelText: 'Dars nomi'),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              onPressed: topic.text.trim().isEmpty
+                  ? null
+                  : () => _startLesson(context, group, today),
+              child: const Text('Darsni boshlash'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _startLesson(
+    BuildContext context,
+    StudyGroup group,
+    DateTime today,
+  ) async {
+    final name = topic.text.trim();
+    final startsAt = group.lessonStartTime.isEmpty
+        ? DateTime.now()
+        : tashkentInstant(
+            today.year,
+            today.month,
+            today.day,
+            int.parse(group.lessonStartTime.split(':')[0]),
+            int.parse(group.lessonStartTime.split(':')[1]),
+          );
+    await runCrmAction(
+      context,
+      () => widget.store.addLesson(group.id, name, startsAt),
+    );
+    topic.clear();
+  }
 }
 
 class _HomeworkTab extends StatelessWidget {
@@ -866,9 +751,9 @@ class _HomeworkTab extends StatelessWidget {
       await showDialog<void>(
         context: context,
         builder: (c) => AlertDialog(
-          title: const Text('Avval dars qo‘shing'),
+          title: const Text('Avval darsni boshlang'),
           content: const Text(
-            'Uy vazifasi darsga bog‘lanadi. Jadval bo‘limida dars mavzusini kiriting.',
+            'Uy vazifasi darsga bog‘lanadi. Davomat bo‘limida bugungi dars nomini kiriting.',
           ),
           actions: [
             TextButton(
@@ -880,16 +765,14 @@ class _HomeworkTab extends StatelessWidget {
       );
       return;
     }
-    final title = TextEditingController(),
-        description = TextEditingController();
+    final title = TextEditingController();
     String lessonId = choices.first.id;
-    DateTime dueDate = DateTime.now().add(const Duration(days: 3));
+    DateTime dueDate = DateTime.now().add(const Duration(days: 7));
+    Uint8List? fileBytes;
+    String? fileName;
     final saved = await showFormDialog<bool>(
       context: context,
-      onDisposed: () {
-        title.dispose();
-        description.dispose();
-      },
+      onDisposed: title.dispose,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, update) => AlertDialog(
           title: const Text('Uy vazifasi berish'),
@@ -922,14 +805,9 @@ class _HomeworkTab extends StatelessWidget {
                   const SizedBox(height: 14),
                   TextField(
                     controller: title,
-                    decoration: const InputDecoration(labelText: 'Vazifa nomi'),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: description,
                     maxLines: 3,
                     decoration: const InputDecoration(
-                      labelText: 'Tushuntirish',
+                      labelText: 'Vazifa (nima qilish kerak)',
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -957,6 +835,30 @@ class _HomeworkTab extends StatelessWidget {
                         );
                     },
                   ),
+                  const SizedBox(height: 6),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.attach_file_outlined),
+                    title: Text(fileName ?? 'Fayl biriktirish (ixtiyoriy)'),
+                    trailing: fileName == null
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () => update(() {
+                              fileBytes = null;
+                              fileName = null;
+                            }),
+                          ),
+                    onTap: () async {
+                      final file = await FilePicker.pickFile();
+                      if (file == null) return;
+                      final bytes = await file.readAsBytes();
+                      update(() {
+                        fileBytes = bytes;
+                        fileName = file.name;
+                      });
+                    },
+                  ),
                 ],
               ),
             ),
@@ -978,15 +880,17 @@ class _HomeworkTab extends StatelessWidget {
       ),
     );
     if (saved == true && context.mounted) {
-      final name = title.text.trim(), text = description.text.trim();
+      final name = title.text.trim();
       await runCrmAction(
         context,
         () => store.addHomework(
           group.id,
           name,
-          text,
+          '',
           dueDate,
           lessonId: lessonId,
+          fileBytes: fileBytes,
+          fileName: fileName,
         ),
       );
     }
@@ -1019,12 +923,24 @@ class _HomeworkCard extends StatelessWidget {
             'Dars: ${store.lessons.where((l) => l.id == homework.lessonId).firstOrNull?.topic ?? '—'}',
             style: const TextStyle(color: AppColors.primary),
           ),
-        Text(homework.description),
+        if (homework.description.isNotEmpty) Text(homework.description),
         const SizedBox(height: 6),
         Text(
           'Muddat: ${shortDate(homework.dueDate)}',
           style: const TextStyle(color: AppColors.muted),
         ),
+        if (homework.filePath != null) ...[
+          const SizedBox(height: 6),
+          TextButton.icon(
+            onPressed: () => runCrmAction(context, () async {
+              final url = await store.homeworkFileUrl(homework.filePath!);
+              if (!context.mounted) return;
+              await launchUrl(Uri.parse(url));
+            }),
+            icon: const Icon(Icons.attach_file_outlined, size: 18),
+            label: Text(homework.fileName ?? 'Fayl'),
+          ),
+        ],
         const Divider(height: 28),
         if (store.activeRole == AppRole.student)
           _StudentHomework(store: store, homework: homework)
@@ -1505,6 +1421,18 @@ IconData _attendanceIcon(AttendanceStatus? status) => switch (status) {
   AttendanceStatus.absent => Icons.cancel,
   null => Icons.remove_circle_outline,
 };
+
+/// Why a teacher can't start/mark today's lesson right now.
+String _scheduleUnavailableReason(StudyGroup group, DateTime today) {
+  if (group.weekDays.isNotEmpty && !group.weekDays.contains(today.weekday)) {
+    return 'Bugun bu guruh uchun dars kuni emas.';
+  }
+  if (group.lessonStartTime.isNotEmpty && group.lessonEndTime.isNotEmpty) {
+    return 'Davomat faqat dars vaqtida '
+        '(${group.lessonStartTime}–${group.lessonEndTime}) ochiladi.';
+  }
+  return 'Hozircha davomat ochilmagan.';
+}
 
 const _enrollmentStatuses = [
   (value: 'active', label: 'Aktiv'),

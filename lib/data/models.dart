@@ -139,6 +139,8 @@ class StudyGroup {
     this.teacherMembershipId = '',
     this.status = 'active',
     this.weekDays = const [],
+    this.lessonStartTime = '',
+    this.lessonEndTime = '',
   });
 
   final String id;
@@ -152,6 +154,9 @@ class StudyGroup {
   final String teacherMembershipId;
   final String status;
   final List<int> weekDays;
+  // "HH:mm", or '' when the group has no fixed lesson time yet.
+  final String lessonStartTime;
+  final String lessonEndTime;
   bool get active => status == 'active';
   String get statusLabel => switch (status) {
     'completed' => 'Tugatilgan',
@@ -169,6 +174,8 @@ class StudyGroup {
     String? room,
     String? status,
     List<int>? weekDays,
+    String? lessonStartTime,
+    String? lessonEndTime,
   }) => StudyGroup(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -181,6 +188,8 @@ class StudyGroup {
     organizationId: organizationId,
     status: status ?? this.status,
     weekDays: List.unmodifiable(weekDays ?? this.weekDays),
+    lessonStartTime: lessonStartTime ?? this.lessonStartTime,
+    lessonEndTime: lessonEndTime ?? this.lessonEndTime,
   );
 }
 
@@ -215,11 +224,16 @@ class Homework {
     required this.description,
     required this.dueDate,
     this.lessonId,
+    this.filePath,
+    this.fileName,
   });
 
   final String id;
   final String groupId;
   final String title;
+  // Attached reference file (task sheet, worksheet, etc.), optional.
+  final String? filePath;
+  final String? fileName;
   final String description;
   final DateTime dueDate;
   final String? lessonId;
