@@ -88,6 +88,8 @@ class Student {
     this.membershipId = '',
     this.completed = false,
     this.left = false,
+    this.enrolledFrom,
+    this.enrolledUntil,
   });
 
   final String id;
@@ -98,6 +100,10 @@ class Student {
   final String membershipId;
   final bool completed;
   final bool left;
+  // The enrollment's own date range, so a journal can tell "absent" apart
+  // from "wasn't in this group yet/anymore" on a given lesson's date.
+  final DateTime? enrolledFrom;
+  final DateTime? enrolledUntil;
   bool get active => !completed && !left;
   String get status => left
       ? 'left'
@@ -109,6 +115,13 @@ class Student {
       : completed
       ? 'Tugatgan'
       : 'Aktiv';
+  bool enrolledOn(DateTime date) {
+    final day = DateTime(date.year, date.month, date.day);
+    if (enrolledFrom != null && day.isBefore(enrolledFrom!)) return false;
+    if (enrolledUntil != null && day.isAfter(enrolledUntil!)) return false;
+    return true;
+  }
+
   Student copyWith({
     String? name,
     String? phone,
@@ -123,6 +136,8 @@ class Student {
     membershipId: membershipId,
     completed: completed ?? this.completed,
     left: left ?? this.left,
+    enrolledFrom: enrolledFrom,
+    enrolledUntil: enrolledUntil,
   );
 }
 

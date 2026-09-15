@@ -404,6 +404,8 @@ class CrmStore extends ChangeNotifier {
         name: user.name,
         phone: user.phone,
         groupId: row['group_id'].toString(),
+        enrolledFrom: DateTime.tryParse(row['starts_on']?.toString() ?? ''),
+        enrolledUntil: DateTime.tryParse(row['ends_on']?.toString() ?? ''),
       );
       students.add(student);
       enrollmentById[student.enrollmentId] = student;

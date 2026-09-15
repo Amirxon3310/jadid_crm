@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/app_theme.dart';
 import '../core/app_icon.dart';
 import '../core/helpers.dart';
+import '../core/user_avatar.dart';
 import '../data/crm_store.dart';
 import '../data/models.dart';
 import 'group_editor.dart';
@@ -196,12 +197,16 @@ class _GroupPageState extends State<GroupPage> {
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1200),
-                    child: pages[tab],
-                  ),
-                ),
+                // The journal's per-lesson columns need the full width; every
+                // other tab stays centered and capped for readability.
+                child: labels[tab] == 'Jurnal'
+                    ? pages[tab]
+                    : Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1200),
+                          child: pages[tab],
+                        ),
+                      ),
               ),
             ),
           ],
@@ -1178,34 +1183,151 @@ class _TeacherHomework extends StatelessWidget {
   }
 }
 
-class _JournalTab extends StatelessWidget {
+const _uzMonths = [
+  'Yanvar',
+  'Fevral',
+  'Mart',
+  'Aprel',
+  'May',
+  'Iyun',
+  'Iyul',
+  'Avgust',
+  'Sentyabr',
+  'Oktyabr',
+  'Noyabr',
+  'Dekabr',
+];
+String _monthLabel(DateTime month) => '${_uzMonths[month.month - 1]} ${month.year}';
+
+/// Blue = submitted, green = accepted, red = not sent or returned — the
+/// journal's own reading of homework status, distinct from the muted/warning
+/// colors used for the status chip elsewhere in the app.
+Color _journalHomeworkColor(HomeworkStatus status) => switch (status) {
+  HomeworkStatus.submitted => AppColors.primary,
+  HomeworkStatus.accepted => AppColors.success,
+  HomeworkStatus.waiting || HomeworkStatus.returned => AppColors.danger,
+};
+
+class _JournalTab extends StatefulWidget {
   const _JournalTab({required this.store, required this.group});
 
   final CrmStore store;
   final StudyGroup group;
 
   @override
+  State<_JournalTab> createState() => _JournalTabState();
+}
+
+class _JournalTabState extends State<_JournalTab> {
+  DateTime? selectedMonth;
+
+  @override
   Widget build(BuildContext context) {
-    final lessons =
+    final store = widget.store, group = widget.group;
+    final allLessons =
         store.lessonsOf(group.id).where((l) => l.status != 'cancelled').toList()
           ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
-    final homeworks = store.homeworksOf(group.id);
     final students = _visibleStudents(store, group.id);
+
+    final months = <DateTime>{
+      for (final l in allLessons)
+        DateTime(tashkentDate(l.startsAt).year, tashkentDate(l.startsAt).month),
+    }.toList()..sort((a, b) => b.compareTo(a));
+    if (months.isNotEmpty &&
+        (selectedMonth == null || !months.contains(selectedMonth))) {
+      selectedMonth = months.first;
+    }
+
+    final lessons = selectedMonth == null
+        ? <Lesson>[]
+        : allLessons.where((l) {
+            final d = tashkentDate(l.startsAt);
+            return d.year == selectedMonth!.year &&
+                d.month == selectedMonth!.month;
+          }).toList();
+    final homeworks = store
+        .homeworksOf(group.id)
+        .where((h) => lessons.any((l) => l.id == h.lessonId))
+        .toList();
     Homework? homeworkFor(Lesson lesson) =>
         homeworks.where((h) => h.lessonId == lesson.id).firstOrNull;
+
+    final attendanceRate = <String, double?>{};
+    final homeworkRate = <String, double?>{};
+    for (final student in students) {
+      final applicable = lessons
+          .where((l) => student.enrolledOn(l.startsAt))
+          .toList();
+      attendanceRate[student.id] = applicable.isEmpty
+          ? null
+          : applicable.where((l) {
+                  final status = store.attendance[l.id]?[student.id];
+                  return status == AttendanceStatus.present ||
+                      status == AttendanceStatus.late;
+                }).length *
+                100 /
+                applicable.length;
+      homeworkRate[student.id] = homeworks.isEmpty
+          ? null
+          : homeworks
+                    .where(
+                      (h) =>
+                          store.resultFor(h.id, student.id).status ==
+                          HomeworkStatus.accepted,
+                    )
+                    .length *
+                100 /
+                homeworks.length;
+    }
+    final sortedStudents = [...students]..sort((a, b) {
+      final scoreA = ((attendanceRate[a.id] ?? 0) + (homeworkRate[a.id] ?? 0)) / 2;
+      final scoreB = ((attendanceRate[b.id] ?? 0) + (homeworkRate[b.id] ?? 0)) / 2;
+      return scoreB.compareTo(scoreA);
+    });
 
     return Surface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Guruh jurnali',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 5),
-          const Text(
-            'Har bir o‘quvchining har darsdagi davomati va uy vazifasi',
-            style: TextStyle(color: AppColors.muted),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const title = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Guruh jurnali',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Oy bo‘yicha davomat va uy vazifasi; eng yaxshi natija tepada',
+                    style: TextStyle(color: AppColors.muted),
+                  ),
+                ],
+              );
+              final picker = months.isEmpty
+                  ? const SizedBox.shrink()
+                  : DropdownButton<DateTime>(
+                      value: selectedMonth,
+                      borderRadius: BorderRadius.circular(16),
+                      items: months
+                          .map(
+                            (m) => DropdownMenuItem(
+                              value: m,
+                              child: Text(_monthLabel(m)),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (m) => setState(() => selectedMonth = m),
+                    );
+              if (constraints.maxWidth < 560) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [title, const SizedBox(height: 12), picker],
+                );
+              }
+              return Row(children: [Expanded(child: title), picker]);
+            },
           ),
           const SizedBox(height: 14),
           Wrap(
@@ -1233,91 +1355,110 @@ class _JournalTab extends StatelessWidget {
                 label: 'Belgilanmagan',
               ),
               _JournalLegend(
-                icon: Icons.assignment_outlined,
+                icon: Icons.check_circle,
                 color: AppColors.primary,
-                label: 'Shu darsga uy vazifasi bor',
+                label: 'Vazifa yuborilgan',
               ),
+              _JournalLegend(
+                icon: Icons.check_circle,
+                color: AppColors.danger,
+                label: 'Vazifa yuborilmagan/qaytarilgan',
+              ),
+              const _JournalSwatchLegend(label: 'Guruhda yo‘q edi'),
             ],
           ),
           const SizedBox(height: 18),
           if (lessons.isEmpty)
-            const EmptyState(text: 'Darslar hali yaratilmagan')
+            EmptyState(
+              text: months.isEmpty
+                  ? 'Darslar hali yaratilmagan'
+                  : 'Bu oyda dars bo‘lmagan',
+            )
           else
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columnSpacing: 22,
-                columns: [
-                  const DataColumn(label: Text('O‘quvchi')),
-                  for (final lesson in lessons)
-                    DataColumn(
-                      label: Tooltip(
-                        message: lesson.topic,
-                        child: Text(shortDate(lesson.startsAt)),
-                      ),
-                    ),
-                  const DataColumn(label: Text('Davomat'), numeric: true),
-                  const DataColumn(label: Text('Uy vazifa'), numeric: true),
-                ],
-                rows: students.map((student) {
-                  final attended = lessons.where((lesson) {
-                    final status = store.attendance[lesson.id]?[student.id];
-                    return status == AttendanceStatus.present ||
-                        status == AttendanceStatus.late;
-                  }).length;
-                  final accepted = homeworks
-                      .where(
-                        (h) =>
-                            store.resultFor(h.id, student.id).status ==
-                            HomeworkStatus.accepted,
-                      )
-                      .length;
-                  return DataRow(
-                    cells: [
-                      DataCell(
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(student.name),
-                            if (student.status != 'active') ...[
-                              const SizedBox(width: 8),
-                              _StatusTag(student.statusLabel, student.status),
-                            ],
-                          ],
+            SizedBox(
+              width: double.infinity,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columnSpacing: 20,
+                  columns: [
+                    const DataColumn(label: Text('#')),
+                    const DataColumn(label: Text('O‘quvchi')),
+                    for (final lesson in lessons)
+                      DataColumn(
+                        label: Tooltip(
+                          message: lesson.topic,
+                          child: Text(shortDate(lesson.startsAt)),
                         ),
                       ),
-                      for (final lesson in lessons)
-                        DataCell(
-                          _JournalCell(
-                            attendance: store.attendance[lesson.id]?[student.id],
-                            homework: homeworkFor(lesson),
-                            homeworkStatus: homeworkFor(lesson) == null
-                                ? null
-                                : store
-                                      .resultFor(
-                                        homeworkFor(lesson)!.id,
-                                        student.id,
-                                      )
-                                      .status,
+                    const DataColumn(label: Text('Davomat'), numeric: true),
+                    const DataColumn(label: Text('Uy vazifa'), numeric: true),
+                  ],
+                  rows: [
+                    for (final (index, student) in sortedStudents.indexed)
+                      DataRow(
+                        cells: [
+                          DataCell(Text('${index + 1}')),
+                          DataCell(
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                UserAvatar(
+                                  store: store,
+                                  user: store.users.firstWhere(
+                                    (u) => u.id == student.id,
+                                  ),
+                                  radius: 14,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(student.name),
+                                if (student.status != 'active') ...[
+                                  const SizedBox(width: 8),
+                                  _StatusTag(
+                                    student.statusLabel,
+                                    student.status,
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
-                        ),
-                      DataCell(
-                        Text(
-                          lessons.isEmpty
-                              ? '—'
-                              : '${(attended * 100 / lessons.length).round()}%',
-                        ),
+                          for (final lesson in lessons)
+                            DataCell(
+                              !student.enrolledOn(lesson.startsAt)
+                                  ? const _JournalAbsentCell()
+                                  : _JournalCell(
+                                      attendance:
+                                          store.attendance[lesson.id]?[student
+                                              .id],
+                                      homework: homeworkFor(lesson),
+                                      homeworkStatus: homeworkFor(lesson) == null
+                                          ? null
+                                          : store
+                                                .resultFor(
+                                                  homeworkFor(lesson)!.id,
+                                                  student.id,
+                                                )
+                                                .status,
+                                    ),
+                            ),
+                          DataCell(
+                            Text(
+                              attendanceRate[student.id] == null
+                                  ? '—'
+                                  : '${attendanceRate[student.id]!.round()}%',
+                            ),
+                          ),
+                          DataCell(
+                            Text(
+                              homeworkRate[student.id] == null
+                                  ? '—'
+                                  : '${homeworkRate[student.id]!.round()}%',
+                            ),
+                          ),
+                        ],
                       ),
-                      DataCell(
-                        Text(
-                          homeworks.isEmpty
-                              ? '—'
-                              : '${(accepted * 100 / homeworks.length).round()}%',
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
+                  ],
+                ),
               ),
             ),
         ],
@@ -1343,6 +1484,45 @@ class _JournalLegend extends StatelessWidget {
       const SizedBox(width: 5),
       Text(label, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
     ],
+  );
+}
+
+class _JournalSwatchLegend extends StatelessWidget {
+  const _JournalSwatchLegend({required this.label});
+  final String label;
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(
+          color: AppColors.ink,
+          borderRadius: BorderRadius.circular(3),
+        ),
+      ),
+      const SizedBox(width: 5),
+      Text(label, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+    ],
+  );
+}
+
+/// A lesson cell for a student who wasn't enrolled in the group yet, or
+/// anymore, on that lesson's date — distinct from being marked absent.
+class _JournalAbsentCell extends StatelessWidget {
+  const _JournalAbsentCell();
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: 'Bu sanada guruhda emas edi',
+    child: Container(
+      width: 34,
+      height: 26,
+      decoration: BoxDecoration(
+        color: AppColors.ink,
+        borderRadius: BorderRadius.circular(6),
+      ),
+    ),
   );
 }
 
@@ -1377,9 +1557,9 @@ class _JournalCell extends StatelessWidget {
           if (homework != null) ...[
             const SizedBox(height: 3),
             Icon(
-              Icons.assignment_outlined,
+              Icons.check_circle,
               size: 13,
-              color: _homeworkColor(homeworkStatus!),
+              color: _journalHomeworkColor(homeworkStatus!),
             ),
           ],
         ],
