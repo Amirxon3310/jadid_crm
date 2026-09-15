@@ -490,6 +490,25 @@ Future<void> _saveStudentAccount(
 
 String _accountError(Object error) => switch (error) {
   ArgumentError(:final message) => '$message',
+  // Supabase answers in English; the two an admin actually runs into are
+  // worth saying in Uzbek, with the way out.
+  AuthException(:final message) when _saysShortPassword(message) =>
+    'Parol juda qisqa. Supabase’da eng kam uzunlik belgilangan — uzunroq '
+        'parol yozing yoki Authentication → Sign In / Providers bo‘limidan '
+        'eng kam uzunlikni kamaytiring.',
+  AuthException(:final message) when _saysTaken(message) =>
+    'Bu login band. Boshqa login tanlang.',
   AuthException(:final message) => message,
   _ => 'Akkaunt yaratilmadi. Login band bo‘lishi mumkin.',
 };
+
+bool _saysShortPassword(String message) {
+  final text = message.toLowerCase();
+  return text.contains('password') &&
+      (text.contains('at least') || text.contains('should be'));
+}
+
+bool _saysTaken(String message) {
+  final text = message.toLowerCase();
+  return text.contains('already registered') || text.contains('already exists');
+}

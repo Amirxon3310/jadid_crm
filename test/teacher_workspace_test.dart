@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jadid_crm/data/crm_store.dart';
 import 'package:jadid_crm/data/models.dart';
+import 'package:jadid_crm/features/people_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'support/fake_crm_backend.dart';
 
@@ -376,4 +378,57 @@ void main() {
       );
     },
   );
+
+  testWidgets('a rejected sign-up is explained in Uzbek, with the way out', (
+    tester,
+  ) async {
+    final backend = FakeCrmBackend();
+    await backend.signIn();
+    final signUpBackend = FakeCrmBackend()
+      ..authError = 'Password should be at least 6 characters.';
+    final store = CrmStore.online(
+      backend.client,
+      enableLiveUpdates: false,
+      newAccountClient: () => signUpBackend.client,
+    );
+    addTearDown(store.dispose);
+    await tester.runAsync(store.load);
+    store.activeRole = AppRole.admin;
+
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1200, 2400);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: PeoplePage(store: store, showTeachers: false),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('O‘quvchi qo‘shish'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Ism va familiya'),
+      'Yangi O‘quvchi',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Yaratish'));
+    // The sign-up is real network work, so it only progresses outside the
+    // fake async zone.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
+    // Frame by frame, not pumpAndSettle: the notice dismisses itself, and
+    // settling would run fake time straight past it.
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    // The English default would leave the admin with no idea where to look.
+    expect(find.textContaining('Parol juda qisqa'), findsOneWidget);
+    expect(find.textContaining('Authentication'), findsOneWidget);
+    expect(find.textContaining('Password should be'), findsNothing);
+  });
 }

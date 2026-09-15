@@ -11,6 +11,9 @@ class FakeCrmBackend {
   int writeNumber = 0;
   final failWriteNumbers = <int>{};
 
+  /// What Auth answers instead of a session, verbatim as Supabase words it.
+  String? authError;
+
   /// Tables a database predating their migration would not have yet.
   final missingTables = <String>{};
   Completer<void>? writeGate;
@@ -108,6 +111,8 @@ class FakeCrmBackend {
     final path = request.url.path;
     if (path.contains('/auth/')) {
       if (path.endsWith('/logout')) return http.Response('', 204);
+      if (authError != null)
+        return json({'message': authError, 'code': 422}, status: 422);
       return json({
         'access_token': 'test-token',
         'refresh_token': 'refresh-token',
