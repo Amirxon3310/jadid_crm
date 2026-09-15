@@ -3,13 +3,21 @@ import 'package:flutter/material.dart';
 abstract final class AppColors {
   static const primary = Color(0xFF279EFA);
   static const background = Color(0xFFF4F5FE);
-  static const softBlue = Color(0xFFEAF6FF);
   static const success = Color(0xFF2DCD94);
   static const warning = Color(0xFFF5A623);
   static const danger = Color(0xFFFF4D4C);
   static const border = Color(0xFFE6EAF0);
   static const muted = Color(0xFF737373);
   static const ink = Color(0xFF061425);
+
+  /// A soft primary-tinted fill for icon badges, avatars and selected tabs.
+  /// The flat light-blue works on a white surface but needs a translucent
+  /// tint on a dark one, so this reads the active theme instead of being a
+  /// single constant.
+  static Color softBlue(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? primary.withValues(alpha: .18)
+      : const Color(0xFFEAF6FF);
 }
 
 final appThemeMode = ValueNotifier<ThemeMode>(ThemeMode.light);

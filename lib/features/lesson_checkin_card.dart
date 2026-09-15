@@ -22,7 +22,7 @@ class LessonCheckinCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.softBlue,
+        color: AppColors.softBlue(context),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Wrap(

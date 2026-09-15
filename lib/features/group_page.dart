@@ -60,7 +60,6 @@ class _GroupPageState extends State<GroupPage> {
         .firstOrNull;
     if (group == null)
       return Scaffold(
-        backgroundColor: AppColors.background,
         body: SafeArea(
           child: Column(
             children: [
@@ -96,17 +95,16 @@ class _GroupPageState extends State<GroupPage> {
     ];
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 14),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1200),
                   child: Container(
-                    padding: const EdgeInsets.fromLTRB(8, 8, 12, 4),
+                    padding: const EdgeInsets.fromLTRB(8, 16, 12, 12),
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(24),
@@ -163,6 +161,7 @@ class _GroupPageState extends State<GroupPage> {
                               ),
                           ],
                         ),
+                        const SizedBox(height: 10),
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.only(left: 4),
@@ -180,7 +179,7 @@ class _GroupPageState extends State<GroupPage> {
                                         ? AppColors.primary
                                         : AppColors.muted,
                                     backgroundColor: selected
-                                        ? AppColors.softBlue
+                                        ? AppColors.softBlue(context)
                                         : Colors.transparent,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -388,7 +387,7 @@ class _Detail extends StatelessWidget {
       Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: AppColors.softBlue,
+          color: AppColors.softBlue(context),
           borderRadius: BorderRadius.circular(12),
         ),
         child: AppIcon(asset, active: true, fallback: icon, size: 24),
@@ -446,9 +445,9 @@ class _ScheduleTab extends StatelessWidget {
           for (final lesson in lessons)
             ListTile(
               contentPadding: const EdgeInsets.symmetric(vertical: 5),
-              leading: const CircleAvatar(
-                backgroundColor: AppColors.softBlue,
-                child: Icon(
+              leading: CircleAvatar(
+                backgroundColor: AppColors.softBlue(context),
+                child: const Icon(
                   Icons.calendar_today_outlined,
                   color: AppColors.primary,
                 ),
@@ -1507,7 +1506,7 @@ class _RankingTab extends StatelessWidget {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: CircleAvatar(
-                backgroundColor: AppColors.softBlue,
+                backgroundColor: AppColors.softBlue(context),
                 child: Text(
                   '${store.activeRole == AppRole.student ? store.rankFor(groupId: group.id) ?? '—' : 1 + students.where((s) => store.coinsOf(s.id) > store.coinsOf(student.id)).length}',
                 ),

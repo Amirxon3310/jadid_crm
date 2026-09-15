@@ -355,7 +355,7 @@ class _WorkspaceState extends State<Workspace> {
                     message: compact ? menu[index].title : '',
                     child: Material(
                       color: profileUserId == null && selectedPage == index
-                          ? AppColors.softBlue
+                          ? AppColors.softBlue(context)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(20),
                       child: InkWell(

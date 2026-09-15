@@ -28,9 +28,9 @@ class BranchesPage extends StatelessWidget {
           for (final branch in store.branches)
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const CircleAvatar(
-                backgroundColor: AppColors.softBlue,
-                child: Icon(
+              leading: CircleAvatar(
+                backgroundColor: AppColors.softBlue(context),
+                child: const Icon(
                   Icons.location_on_outlined,
                   color: AppColors.primary,
                 ),

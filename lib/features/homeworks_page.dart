@@ -44,9 +44,9 @@ class HomeworksPage extends StatelessWidget {
                 }).length;
                 return ListTile(
                   contentPadding: const EdgeInsets.symmetric(vertical: 7),
-                  leading: const CircleAvatar(
-                    backgroundColor: AppColors.softBlue,
-                    child: Icon(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.softBlue(context),
+                    child: const Icon(
                       Icons.assignment_outlined,
                       color: AppColors.primary,
                     ),
