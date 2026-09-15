@@ -1,8 +1,14 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
+
+import '../core/app_notice.dart';
 import '../core/app_theme.dart';
 import '../core/app_icon.dart';
 import '../core/helpers.dart';
+import '../data/auth_service.dart';
 import '../data/crm_store.dart';
 import '../data/models.dart';
 import '../core/user_avatar.dart';
@@ -117,9 +123,11 @@ class PeoplePage extends StatelessWidget {
         children: [
           _responsiveHeader(
             title: 'O‘quvchilar ro‘yxati',
-            button: store.activeRole == AppRole.admin && !store.isOnline
+            button: store.activeRole == AppRole.admin
                 ? FilledButton.icon(
-                    onPressed: () => _addStudent(context),
+                    onPressed: () => store.isOnline
+                        ? _addStudentAccount(context, store)
+                        : _addStudent(context),
                     icon: const Icon(Icons.add),
                     label: const Text('O‘quvchi qo‘shish'),
                   )
@@ -322,3 +330,166 @@ Widget _responsiveHeader({required String title, Widget? button}) {
     },
   );
 }
+
+String _fourDigits() => '${1000 + Random().nextInt(9000)}';
+
+/// Creates a pupil's account: the login and password start as four-digit
+/// suggestions the admin can accept or type over.
+Future<void> _addStudentAccount(BuildContext context, CrmStore store) async {
+  final name = TextEditingController();
+  final login = TextEditingController(text: _fourDigits());
+  final password = TextEditingController(text: _fourDigits());
+  final form = GlobalKey<FormState>();
+  final entered =
+      await showFormDialog<({String name, String login, String password})>(
+        context: context,
+        onDisposed: () {
+          name.dispose();
+          login.dispose();
+          password.dispose();
+        },
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, update) => AlertDialog(
+            title: const Text('Yangi o‘quvchi'),
+            content: SizedBox(
+              width: 440,
+              child: Form(
+                key: form,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: name,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Ism va familiya',
+                      ),
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Ism va familiyani kiriting'
+                          : null,
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: login,
+                      decoration: InputDecoration(
+                        labelText: 'Login',
+                        suffixIcon: IconButton(
+                          tooltip: 'Boshqa raqam',
+                          onPressed: () =>
+                              update(() => login.text = _fourDigits()),
+                          icon: const Icon(Icons.casino_outlined, size: 20),
+                        ),
+                      ),
+                      validator: (v) => AuthService.validateLogin(v ?? ''),
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: password,
+                      decoration: InputDecoration(
+                        labelText: 'Parol',
+                        suffixIcon: IconButton(
+                          tooltip: 'Boshqa raqam',
+                          onPressed: () =>
+                              update(() => password.text = _fourDigits()),
+                          icon: const Icon(Icons.casino_outlined, size: 20),
+                        ),
+                      ),
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Parolni kiriting'
+                          : null,
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Login va parol taklif qilindi — xohlasangiz o‘zingiznikini '
+                      'yozing. O‘quvchi shu login va parol bilan kiradi.',
+                      style: TextStyle(fontSize: 12, color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Bekor qilish'),
+              ),
+              FilledButton(
+                // Stays open on invalid input so the message is visible.
+                onPressed: () {
+                  if (form.currentState!.validate()) {
+                    // Read while the controllers are still alive: the dialog
+                    // disposes them as it closes.
+                    Navigator.pop(dialogContext, (
+                      name: name.text.trim(),
+                      login: login.text.trim(),
+                      password: password.text.trim(),
+                    ));
+                  }
+                },
+                child: const Text('Yaratish'),
+              ),
+            ],
+          ),
+        ),
+      );
+  // Saved from the page's own context, which outlives the dialog.
+  if (entered == null || !context.mounted) return;
+  await _saveStudentAccount(
+    context,
+    store,
+    name: entered.name,
+    login: entered.login,
+    password: entered.password,
+  );
+}
+
+Future<void> _saveStudentAccount(
+  BuildContext context,
+  CrmStore store, {
+  required String name,
+  required String login,
+  required String password,
+}) async {
+  try {
+    await store.createStudentAccount(
+      name: name,
+      login: login,
+      password: password,
+    );
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (c) => AlertDialog(
+        icon: const Icon(Icons.check_circle, color: AppColors.rewardGreen),
+        title: const Text('Akkaunt yaratildi'),
+        content: SizedBox(
+          width: 380,
+          child: Text(
+            '$name uchun:\n\nLogin: $login\nParol: $password\n\n'
+            'Shu ma’lumotlarni o‘quvchiga bering. Qolgan ma’lumotlarini '
+            'profilidan to‘ldirasiz.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('Yopish'),
+          ),
+        ],
+      ),
+    );
+  } catch (error) {
+    // The server's own words matter here: a password the project deems too
+    // short has to say so, not turn into a generic failure.
+    if (context.mounted) {
+      showAppNotice(context, _accountError(error), isError: true);
+    }
+  }
+}
+
+String _accountError(Object error) => switch (error) {
+  ArgumentError(:final message) => '$message',
+  AuthException(:final message) => message,
+  _ => 'Akkaunt yaratilmadi. Login band bo‘lishi mumkin.',
+};

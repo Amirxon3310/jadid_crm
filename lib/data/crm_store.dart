@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'dashboard_metrics.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/app_config.dart';
+import 'auth_service.dart';
 import 'models.dart';
 import 'student_portal.dart';
 import 'optimistic_queue.dart';
@@ -12,8 +14,15 @@ part 'teacher_store.dart';
 /// UI faqat shu sodda qatlam bilan ishlaydi. Demo rejim testlar uchun qolgan,
 /// real ilova esa [CrmStore.online] orqali Supabase'dan foydalanadi.
 class CrmStore extends ChangeNotifier {
-  CrmStore() : client = null, enableLiveUpdates = false;
-  CrmStore.online(this.client, {this.enableLiveUpdates = true}) {
+  CrmStore()
+    : client = null,
+      enableLiveUpdates = false,
+      newAccountClient = null;
+  CrmStore.online(
+    this.client, {
+    this.enableLiveUpdates = true,
+    this.newAccountClient,
+  }) {
     users.clear();
     groups.clear();
     students.clear();
@@ -65,6 +74,11 @@ class CrmStore extends ChangeNotifier {
   }
 
   final SupabaseClient? client;
+
+  /// Builds the throwaway client a new pupil's sign-up runs on, so creating
+  /// an account never touches the admin's own session. Tests supply their
+  /// own; in the app it is left null and a real one is made on demand.
+  final SupabaseClient Function()? newAccountClient;
   final bool enableLiveUpdates;
   RealtimeChannel? _liveChannel;
   Timer? _liveTimer;
@@ -937,6 +951,42 @@ class CrmStore extends ChangeNotifier {
         groupId: groupId,
       ),
     );
+    notifyListeners();
+  }
+
+  /// Creates a pupil's account and reloads so they appear in the lists.
+  /// The sign-up runs on its own client: the admin stays signed in as
+  /// themselves, and the server decides the role, not this call.
+  Future<void> createStudentAccount({
+    required String name,
+    required String login,
+    required String password,
+  }) async {
+    if (activeRole != AppRole.admin) throw StateError('Admin huquqi kerak.');
+    if (!isOnline)
+      throw UnsupportedError('Akkaunt yaratish faqat serverda ishlaydi.');
+    if (name.trim().isEmpty) throw ArgumentError('Ism va familiyani kiriting.');
+    final problem = AuthService.validateLogin(login);
+    if (problem != null) throw ArgumentError(problem);
+    final signUp =
+        (newAccountClient ??
+                () => SupabaseClient(
+                  AppConfig.supabaseUrl,
+                  AppConfig.supabasePublishableKey,
+                  authOptions: const AuthClientOptions(autoRefreshToken: false),
+                ))
+            .call();
+    try {
+      await AuthService(signUp).register(
+        login: login,
+        password: password,
+        name: name.trim(),
+        role: 'student',
+      );
+    } finally {
+      await signUp.dispose();
+    }
+    await load();
     notifyListeners();
   }
 

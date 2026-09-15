@@ -88,7 +88,10 @@ class FakeCrmBackend {
   late final client = SupabaseClient(
     'https://example.test',
     'test-key',
-    authOptions: const AuthClientOptions(autoRefreshToken: false),
+    authOptions: const AuthClientOptions(
+      authFlowType: AuthFlowType.implicit,
+      autoRefreshToken: false,
+    ),
     httpClient: MockClient(_handle),
   );
 

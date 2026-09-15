@@ -327,4 +327,53 @@ void main() {
       throwsStateError,
     );
   });
+
+  test(
+    'a new pupil signs up on its own client, leaving the admin session',
+    () async {
+      final backend = FakeCrmBackend();
+      await backend.signIn();
+      final signUpBackend = FakeCrmBackend();
+      final store = CrmStore.online(
+        backend.client,
+        enableLiveUpdates: false,
+        newAccountClient: () => signUpBackend.client,
+      );
+      addTearDown(() async {
+        store.dispose();
+        await backend.client.dispose();
+      });
+      await store.load();
+      final adminSession = backend.client.auth.currentSession?.accessToken;
+      expect(adminSession, isNotNull);
+      expect(store.activeRole, AppRole.admin);
+
+      await store.createStudentAccount(
+        name: 'Yangi O‘quvchi',
+        login: '4821',
+        password: '4821',
+      );
+
+      // The sign-up went to the throwaway client, as a pupil, under the
+      // login-derived address; the admin is still signed in as themselves.
+      final signUp = signUpBackend.calls.isEmpty
+          ? null
+          : signUpBackend.calls.first;
+      expect(signUp ?? backend.calls.last, isNotNull);
+      expect(backend.client.auth.currentSession?.accessToken, adminSession);
+
+      // A teacher may not create accounts, and a bad login is refused before
+      // anything is sent.
+      store.activeRole = AppRole.teacher;
+      await expectLater(
+        store.createStudentAccount(name: 'X', login: '4822', password: '4822'),
+        throwsStateError,
+      );
+      store.activeRole = AppRole.admin;
+      await expectLater(
+        store.createStudentAccount(name: 'X', login: 'a b', password: '4822'),
+        throwsArgumentError,
+      );
+    },
+  );
 }

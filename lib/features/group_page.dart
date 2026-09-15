@@ -1411,21 +1411,33 @@ class _JournalTabState extends State<_JournalTab> {
               );
               final picker = months.isEmpty
                   ? const SizedBox.shrink()
-                  : DropdownButton<DateTime?>(
-                      value: selectedMonth,
-                      borderRadius: BorderRadius.circular(16),
-                      items: [
-                        const DropdownMenuItem(
-                          value: null,
-                          child: Text('Hammasi'),
-                        ),
-                        for (final m in months)
-                          DropdownMenuItem(
-                            value: m,
-                            child: Text(_monthLabel(m)),
+                  : SizedBox(
+                      width: 240,
+                      child: DropdownButtonFormField<DateTime?>(
+                        initialValue: selectedMonth,
+                        isExpanded: true,
+                        borderRadius: BorderRadius.circular(16),
+                        decoration: const InputDecoration(
+                          labelText: 'Davr',
+                          prefixIcon: Icon(
+                            Icons.calendar_month_outlined,
+                            size: 20,
                           ),
-                      ],
-                      onChanged: (m) => setState(() => selectedMonth = m),
+                          isDense: true,
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('Hammasi'),
+                          ),
+                          for (final m in months)
+                            DropdownMenuItem(
+                              value: m,
+                              child: Text(_monthLabel(m)),
+                            ),
+                        ],
+                        onChanged: (m) => setState(() => selectedMonth = m),
+                      ),
                     );
               if (constraints.maxWidth < 560) {
                 return Column(
