@@ -1,8 +1,9 @@
-import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/app_notice.dart';
 import '../core/app_theme.dart';
 import '../core/app_icon.dart';
 import '../core/helpers.dart';
@@ -2526,20 +2527,81 @@ Future<void> showAddAward(
 
 /// The awards table has to exist before points can be handed out. Rather
 /// than a button that does nothing, say which migration is missing.
+const _awardsMigrationAsset =
+    'supabase/migrations/20260916140000_score_awards.sql';
+
 Future<void> _showAwardsSetup(BuildContext context) => showDialog<void>(
   context: context,
   builder: (dialogContext) => AlertDialog(
     icon: const Icon(Icons.storage_rounded, color: AppColors.warning),
     title: const Text('Ball qo‘shish uchun bir marta sozlash'),
-    content: const SizedBox(
-      width: 460,
-      child: Text(
-        'Qo‘shimcha ball uchun bazada alohida jadval kerak, u hali '
-        'qo‘llanmagan.\n\n'
-        'Supabase → SQL Editor’da quyidagi faylni bir marta bajaring:\n'
-        'supabase/migrations/20260916140000_score_awards.sql\n\n'
-        'Shundan keyin shu oynadan ball berish ishlaydi. Ilovaning qolgan '
-        'qismi hozir ham normal ishlaydi.',
+    content: SizedBox(
+      width: 560,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Qo‘shimcha ball uchun bazada alohida jadval kerak, u hali '
+            'qo‘llanmagan. Quyidagi SQL’ni nusxalab, Supabase → SQL '
+            'Editor’ga qo‘ying va bir marta “Run” bosing. Keyin shu '
+            'sahifani yangilang.',
+          ),
+          const SizedBox(height: 14),
+          // Straight from the migration file, so what is copied here is
+          // exactly what the repository would apply.
+          FutureBuilder<String>(
+            future: rootBundle.loadString(_awardsMigrationAsset),
+            builder: (context, snapshot) {
+              final sql = snapshot.data;
+              if (sql == null) {
+                // A plain line rather than a spinner: nothing here should
+                // animate forever if the file cannot be read.
+                return const SizedBox(
+                  height: 60,
+                  child: Center(child: Text('SQL yuklanmoqda…')),
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 220,
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.ink.withValues(alpha: .06),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: SingleChildScrollView(
+                      child: SelectableText(
+                        sql,
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.rewardGreen,
+                    ),
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: sql));
+                      if (context.mounted) {
+                        showAppNotice(context, 'SQL nusxalandi');
+                      }
+                    },
+                    icon: const Icon(Icons.copy_rounded),
+                    label: const Text('SQL’ni nusxalash'),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     ),
     actions: [
