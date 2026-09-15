@@ -955,6 +955,11 @@ class CrmStore extends ChangeNotifier {
 
   bool get profileFeaturesReady => !isOnline || _profileFeaturesReady;
   bool _profileFeaturesReady = false;
+
+  /// False when the database predates the score_awards migration: rewards and
+  /// penalties are then unavailable, but everything else keeps working.
+  bool get scoreAwardsReady => !isOnline || _scoreAwardsReady;
+  bool _scoreAwardsReady = false;
   final branches = <String>[];
   final payments = <PaymentRecord>[];
   Map<String, dynamic> _studentRanks = {};

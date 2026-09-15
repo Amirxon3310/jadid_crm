@@ -10,6 +10,8 @@ class FakeCrmBackend {
   String authId = 'admin';
   int writeNumber = 0;
   final failWriteNumbers = <int>{};
+  /// Tables a database predating their migration would not have yet.
+  final missingTables = <String>{};
   Completer<void>? writeGate;
   Completer<void>? readGate;
   int nextId = 100;
@@ -141,7 +143,14 @@ class FakeCrmBackend {
       });
     if (request.method == 'GET') {
       await readGate?.future;
-      return json(tables[path.split('/').last]!);
+      final table = path.split('/').last;
+      if (missingTables.contains(table))
+        return json({
+          'code': 'PGRST205',
+          'message':
+              "Could not find the table 'public.$table' in the schema cache",
+        }, status: 404);
+      return json(tables[table]!);
     }
     final reject = failWriteNumbers.contains(++writeNumber) || failWrites;
     await writeGate?.future;

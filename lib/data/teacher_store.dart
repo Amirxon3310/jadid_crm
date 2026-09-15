@@ -91,6 +91,7 @@ extension TeacherStore on CrmStore {
         ..addAll(fresh._pointBaseline);
       _dashboardMetrics = fresh._dashboardMetrics;
       _profileFeaturesReady = fresh._profileFeaturesReady;
+      _scoreAwardsReady = fresh._scoreAwardsReady;
       notifyListeners();
       return true;
     } catch (_) {
@@ -108,23 +109,31 @@ extension TeacherStore on CrmStore {
     _pointBaseline.clear();
     scoreAwards.clear();
     // RLS narrows this to the pupil's own history, or to the groups a staff
-    // member manages.
+    // member manages. A database that hasn't had the awards migration
+    // applied yet simply has no awards — the rest of the app still loads.
+    _scoreAwardsReady = true;
     final memberName = {for (final u in users) u.membershipId: u.name};
     final memberUser = {for (final u in users) u.membershipId: u.id};
-    for (final row in await client!.from('score_awards').select()) {
-      final studentId = memberUser[row['student_membership_id'].toString()];
-      if (studentId == null) continue;
-      scoreAwards.add(
-        ScoreAward(
-          id: row['id'].toString(),
-          studentId: studentId,
-          groupId: row['group_id']?.toString(),
-          amount: (row['amount'] as num).toInt(),
-          note: row['note']?.toString() ?? '',
-          byName: memberName[row['created_by'].toString()] ?? 'Xodim',
-          createdAt: DateTime.parse(row['created_at'].toString()).toLocal(),
-        ),
-      );
+    try {
+      for (final row in await client!.from('score_awards').select()) {
+        final studentId = memberUser[row['student_membership_id'].toString()];
+        if (studentId == null) continue;
+        scoreAwards.add(
+          ScoreAward(
+            id: row['id'].toString(),
+            studentId: studentId,
+            groupId: row['group_id']?.toString(),
+            amount: (row['amount'] as num).toInt(),
+            note: row['note']?.toString() ?? '',
+            byName: memberName[row['created_by'].toString()] ?? 'Xodim',
+            createdAt: DateTime.parse(row['created_at'].toString()).toLocal(),
+          ),
+        );
+      }
+    } on PostgrestException catch (error) {
+      // PGRST205: not in the schema cache. 42P01: no such relation.
+      if (error.code != 'PGRST205' && error.code != '42P01') rethrow;
+      _scoreAwardsReady = false;
     }
     if (activeRole != AppRole.student) {
       final rows = await client!.from('lesson_checkins').select();

@@ -2053,7 +2053,15 @@ Future<void> _showAwardHistory(
                         '${award.byName} • ${shortDate(award.createdAt)}',
                       ),
                     ),
-                  if (store.canManageGroup(group.id)) ...[
+                  if (!store.scoreAwardsReady)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 12),
+                      child: Text(
+                        'Qo‘shimcha ball imkoniyati bazaga hali qo‘shilmagan.',
+                        style: TextStyle(color: AppColors.muted),
+                      ),
+                    )
+                  else if (store.canManageGroup(group.id)) ...[
                     const Divider(height: 26),
                     Row(
                       children: [

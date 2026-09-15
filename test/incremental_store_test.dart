@@ -202,4 +202,38 @@ void main() {
       expectNoReload();
     },
   );
+
+  test('a database without the awards table still loads the rest', () async {
+    final oldBackend = FakeCrmBackend()..missingTables.add('score_awards');
+    await oldBackend.signIn();
+    final oldStore = CrmStore.online(
+      oldBackend.client,
+      enableLiveUpdates: false,
+    );
+    addTearDown(() async {
+      oldStore.dispose();
+      await oldBackend.client.dispose();
+    });
+
+    // The missing table used to take the whole load down with it.
+    await oldStore.load();
+    expect(oldStore.groups, isNotEmpty);
+    expect(oldStore.scoreAwards, isEmpty);
+    expect(oldStore.scoreAwardsReady, isFalse);
+    // Points still add up from lessons alone.
+    expect(oldStore.pointsOf(oldStore.students.first.id), isA<int>());
+
+    // Any other Postgrest failure is still a real failure.
+    final brokenBackend = FakeCrmBackend()..missingTables.add('groups');
+    await brokenBackend.signIn();
+    final brokenStore = CrmStore.online(
+      brokenBackend.client,
+      enableLiveUpdates: false,
+    );
+    addTearDown(() async {
+      brokenStore.dispose();
+      await brokenBackend.client.dispose();
+    });
+    await expectLater(brokenStore.load(), throwsA(isA<PostgrestException>()));
+  });
 }
