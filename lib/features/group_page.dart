@@ -2362,11 +2362,13 @@ Future<void> _showAwardHistory(
                   for (final award in awards)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: SizedBox(
-                        width: 52,
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: _SignedPoints(award.amount),
+                      // Wide enough to keep the notes lined up, but free to
+                      // grow: a four-digit penalty must not overflow it.
+                      leading: ConstrainedBox(
+                        constraints: const BoxConstraints(minWidth: 64),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [_SignedPoints(award.amount)],
                         ),
                       ),
                       title: Text(award.note.isEmpty ? '—' : award.note),

@@ -318,6 +318,50 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('the award history fits the widest penalty without overflow', (
+    tester,
+  ) async {
+    final store = CrmStore()..changeRole(AppRole.admin);
+    addTearDown(store.dispose);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1440, 1000);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    // The extremes the column allows, one of them with no reason given.
+    await store.addScoreAward(
+      studentId: 'student-1',
+      groupId: 'g1',
+      amount: -1000,
+      note: '',
+    );
+    await store.addScoreAward(
+      studentId: 'student-1',
+      groupId: 'g1',
+      amount: 1000,
+      note: 'Juda uzun izoh: viloyat olimpiadasida birinchi o‘rin',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: GroupPage(store: store, group: store.groups.first, startTab: 4),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ali Karimov'));
+    await tester.pumpAndSettle();
+
+    Finder inDialog(String text) => find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text(text),
+    );
+    expect(inDialog('-1000'), findsOneWidget);
+    expect(inDialog('+1000'), findsOneWidget);
+    // A RenderFlex overflow would surface here.
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('a temporary team sums its pupils and takes their place', (
     tester,
   ) async {
