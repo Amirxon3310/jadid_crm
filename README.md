@@ -140,10 +140,40 @@ Barcha jadvallarni o‘qish akkauntga dastlab kirishda bajariladi. Token yangila
 va takroriy kirish hodisalari mavjud store va ochiq sahifani almashtirmaydi.
 “Yangilash” menyusi yo‘q; odatiy saqlash amallari to‘liq qayta yuklashni chaqirmaydi.
 
+## Ustoz kabineti va guruh boshqaruvi
+
+Admin **Guruhlar**da yangi guruh ochadi; ustozni darhol yoki keyinroq biriktiradi
+(“Hozircha biriktirilmagan” holati ham bo‘lishi mumkin). Guruh uchun holat — **Faol**,
+**Tugatilgan** yoki **Muzlatilgan** — va haftalik dars kunlari belgilanadi.
+
+Ustoz dashboardida faqat o‘ziga biriktirilgan guruhlar bo‘yicha statistika chiqadi:
+jami guruhlar, jami o‘quvchilar, ketgan o‘quvchilar va bitirgan o‘quvchilar foizi
+(bitirganlar / jami o‘quvchilar × 100). Har bir guruh kartasida holati, davomat,
+uy vazifa bajarilishi va o‘quvchilar reytingi ko‘rinadi. Admin yoki shu guruh ustozi
+o‘quvchini **Aktiv / Ketgan / Tugatgan** deb belgilaydi; bu holat guruh faol bo‘lishidan
+qat’i nazar o‘quvchining shu guruhdagi tarixida saqlanadi.
+
+Suratli davomat: ustoz avval guruh uchun belgilangan dars kunida o‘zini kamerada
+suratga oladi (brauzerda `getUserMedia`, mobil/ilovada qurilma kamerasi orqali),
+shundan keyingina shu darsga davomat belgilash ochiladi. Surat har dars uchun bitta
+marta olinadi va faqat shu guruh xodimlariga ko‘rinadi; sana va guruh boshqa
+bo‘lsa server ham rad etadi. Dars mavzusini ustoz o‘zi kiritadi va shu darsga
+bog‘langan uy vazifasini beradi; o‘quvchi javob yuboradi, ustoz tekshiradi va
+o‘tilgan darslarni ko‘rishda davom etadi.
+
+**Qatnashdi** yoki **Kechikdi** deb belgilangan har bir dars uchun o‘quvchiga bir
+marta 10 coin beriladi (qayta saqlash coinlarni takrorlamaydi). Ushbu o‘zgarishlar
+`supabase/migrations/20260914175803_teacher_workspace.sql` va
+`supabase/migrations/20260914234429_group_creation_visibility.sql` orqali mavjud
+bazaga qo‘llanadi; yangi bazada `schema.sql` ichida allaqachon mavjud.
+`supabase/teacher_workspace_test.sql` begona guruhga yozish, selfisiz yoki boshqa
+kundagi davomat, va coin takrorlanishini tranzaksiyada tekshiradi.
+
 ## O‘quvchi kabineti
 
-- Dashboarddagi coinlar — `accepted` holatidagi vazifalar baholari yig‘indisi.
-  Bir vazifani qayta tekshirish coinlarni takroran qo‘shmaydi.
+- Dashboarddagi coinlar — `accepted` holatidagi vazifalar baholari yig‘indisi
+  hamda **Qatnashdi**/**Kechikdi** deb belgilangan har bir dars uchun 10 coin.
+  Bir vazifani yoki davomatni qayta saqlash coinlarni takroran qo‘shmaydi.
 - Reyting jami coin bo‘yicha: yuqoriroq coin to‘plaganlar soni + 1. Teng coinlar
   bir xil o‘rinni oladi. Guruh reytingi tanlangan guruh a’zolari orasida hisoblanadi.
 - Kurs foizi — `completed` darslar / jami darslar. `cancelled` darslar hisobga

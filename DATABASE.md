@@ -7,6 +7,7 @@ Supabase loyihasi yaratildi va `supabase/schema.sql` migratsiyasi qo‘llandi.
 - `profiles`, `organizations`, `memberships`
 - `groups`, `enrollments`, `lessons`, `attendance`
 - `assignments`, `assignment_results`
+- `branches`, `payments`, `lesson_checkins`
 
 `enrollments` o‘quvchining guruh tarixini saqlaydi. Davomat va vazifa javobi profilga emas, aynan shu a’zolikka bog‘lanadi. Shu sababli o‘quvchi guruh almashtirsa ham eski natijalari yo‘qolmaydi.
 
