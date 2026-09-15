@@ -1,0 +1,105 @@
+import 'package:flutter/material.dart';
+
+abstract final class AppColors {
+  static const primary = Color(0xFF279EFA);
+  static const background = Color(0xFFF4F5FE);
+  static const softBlue = Color(0xFFEAF6FF);
+  static const success = Color(0xFF2DCD94);
+  static const warning = Color(0xFFF5A623);
+  static const danger = Color(0xFFFF4D4C);
+  static const border = Color(0xFFE6EAF0);
+  static const muted = Color(0xFF737373);
+  static const ink = Color(0xFF061425);
+}
+
+final appThemeMode = ValueNotifier<ThemeMode>(ThemeMode.light);
+
+ThemeData buildTheme({Brightness brightness = Brightness.light}) => ThemeData(
+  useMaterial3: true,
+  brightness: brightness,
+  fontFamily: 'SF Pro Display',
+  colorScheme:
+      ColorScheme.fromSeed(
+        seedColor: AppColors.primary,
+        brightness: brightness,
+      ).copyWith(
+        primary: AppColors.primary,
+        surface: brightness == Brightness.dark
+            ? const Color(0xFF1D2635)
+            : Colors.white,
+      ),
+  scaffoldBackgroundColor: brightness == Brightness.dark
+      ? const Color(0xFF121A28)
+      : AppColors.background,
+  dividerColor: AppColors.border,
+  appBarTheme: AppBarTheme(
+    backgroundColor: brightness == Brightness.dark
+        ? const Color(0xFF1D2635)
+        : Colors.white,
+    surfaceTintColor: Colors.transparent,
+    elevation: 0,
+    scrolledUnderElevation: 0,
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    filled: true,
+    fillColor: brightness == Brightness.dark
+        ? const Color(0xFF293344)
+        : AppColors.background,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide.none,
+    ),
+  ),
+  filledButtonTheme: FilledButtonThemeData(
+    style: FilledButton.styleFrom(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+  ),
+);
+
+class Surface extends StatelessWidget {
+  const Surface({
+    super.key,
+    required this.child,
+    this.padding = 24,
+    this.radius = 20,
+  });
+  final Widget child;
+  final double padding;
+  final double radius;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: EdgeInsets.all(padding),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(radius),
+    ),
+    child: child,
+  );
+}
+
+class EmptyState extends StatelessWidget {
+  const EmptyState({
+    super.key,
+    required this.text,
+    this.icon = Icons.inbox_outlined,
+  });
+
+  final String text;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 40),
+    child: Center(
+      child: Column(
+        children: [
+          Icon(icon, size: 42, color: AppColors.muted),
+          const SizedBox(height: 12),
+          Text(text, style: const TextStyle(color: AppColors.muted)),
+        ],
+      ),
+    ),
+  );
+}
