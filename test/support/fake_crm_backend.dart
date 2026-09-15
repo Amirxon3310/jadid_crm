@@ -14,6 +14,12 @@ class FakeCrmBackend {
   /// What Auth answers instead of a session, verbatim as Supabase words it.
   String? authError;
 
+  /// Functions a database predating their migration would not have yet.
+  final missingFunctions = <String>{};
+
+  /// Memberships delete_member was asked to remove.
+  final deletedMembers = <int>[];
+
   /// Tables a database predating their migration would not have yet.
   final missingTables = <String>{};
   Completer<void>? writeGate;
@@ -199,6 +205,23 @@ class FakeCrmBackend {
       )['ends_on'] = payload['p_completed'] == true
           ? '2026-09-14'
           : null;
+      return json(null);
+    }
+    if (path.endsWith('/rpc/delete_member')) {
+      if (missingFunctions.contains('delete_member'))
+        return json({
+          'code': 'PGRST202',
+          'message': 'Could not find the function public.delete_member',
+        }, status: 404);
+      final id = payload['p_membership_id'];
+      deletedMembers.add(id as int);
+      tables['memberships']!.removeWhere((m) => m['id'] == id);
+      tables['enrollments']!.removeWhere(
+        (e) => e['student_membership_id'] == id,
+      );
+      tables['groups']!
+          .where((g) => g['teacher_membership_id'] == id)
+          .forEach((g) => g['teacher_membership_id'] = null);
       return json(null);
     }
     if (path.endsWith('/rpc/save_profile')) {

@@ -380,13 +380,24 @@ class _WorkspaceState extends State<Workspace> {
                                   ? MainAxisAlignment.center
                                   : MainAxisAlignment.start,
                               children: [
-                                AppIcon(
-                                  menu[index].asset,
-                                  active:
-                                      profileUserId == null &&
-                                      selectedPage == index,
-                                  fallback: menu[index].icon,
-                                  size: 27,
+                                Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    AppIcon(
+                                      menu[index].asset,
+                                      active:
+                                          profileUserId == null &&
+                                          selectedPage == index,
+                                      fallback: menu[index].icon,
+                                      size: 27,
+                                    ),
+                                    if (menu[index].badge > 0)
+                                      Positioned(
+                                        top: -6,
+                                        right: -9,
+                                        child: _MenuBadge(menu[index].badge),
+                                      ),
+                                  ],
                                 ),
                                 if (!compact) ...[
                                   const SizedBox(width: 14),
@@ -526,6 +537,9 @@ class _WorkspaceState extends State<Workspace> {
       null,
       Icons.assignment_outlined,
       HomeworksPage(store: widget.store),
+      // A pupil sees what they still owe; staff see what is waiting to be
+      // marked.
+      badge: widget.store.homeworkBadgeCount(),
     ),
   ];
 
@@ -539,9 +553,49 @@ class _WorkspaceState extends State<Workspace> {
 }
 
 class _MenuItem {
-  const _MenuItem(this.title, this.asset, this.icon, this.page);
+  const _MenuItem(
+    this.title,
+    this.asset,
+    this.icon,
+    this.page, {
+    this.badge = 0,
+  });
   final String title;
   final String? asset;
   final IconData icon;
   final Widget page;
+
+  /// Count shown in a red badge on the menu row; 0 shows nothing.
+  final int badge;
+}
+
+/// The red count that rides on a menu row's icon.
+class _MenuBadge extends StatelessWidget {
+  const _MenuBadge(this.count);
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(minWidth: 19),
+    height: 19,
+    padding: const EdgeInsets.symmetric(horizontal: 5),
+    decoration: BoxDecoration(
+      color: AppColors.penaltyRed,
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(
+        color: Theme.of(context).colorScheme.surface,
+        width: 2,
+      ),
+    ),
+    alignment: Alignment.center,
+    child: Text(
+      count > 99 ? '99+' : '$count',
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 11,
+        height: 1,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
 }

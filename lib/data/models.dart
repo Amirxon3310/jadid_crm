@@ -262,6 +262,8 @@ class HomeworkResult {
     this.status = HomeworkStatus.waiting,
     this.score,
     this.comment = '',
+    this.filePath,
+    this.fileName,
   });
 
   final String homeworkId;
@@ -270,6 +272,9 @@ class HomeworkResult {
   HomeworkStatus status;
   int? score;
   String comment;
+  // File the pupil attached to the answer, optional.
+  String? filePath;
+  String? fileName;
 }
 
 class LessonCheckin {

@@ -51,7 +51,8 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pump();
     expect(find.text('Saqlandi'), findsNothing);
-    pending.completeError(StateError('Offline'));
+    // An error from the network, with nothing readable to say.
+    pending.completeError(Exception('socket closed'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Saqlandi'), findsNothing);
@@ -62,6 +63,38 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 6));
     expect(find.textContaining('Amal bajarilmadi.'), findsNothing);
+  });
+
+  testWidgets('an error the app wrote itself is shown as written', (
+    tester,
+  ) async {
+    final pending = Completer<void>();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => runCrmAction(context, () => pending.future),
+              child: const Text('Save'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Save'));
+    await tester.pump();
+    pending.completeError(StateError('Guruh faol emas.'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    // The generic advice would hide the one thing that explains the refusal.
+    expect(find.text('Guruh faol emas.'), findsOneWidget);
+    expect(find.textContaining('Amal bajarilmadi.'), findsNothing);
+  });
+
+  test('Dart\'s own lookup failures keep the general advice', () {
+    expect(crmActionError(StateError('No element')), startsWith('Amal'));
+    expect(crmActionError(Exception('x')), startsWith('Amal'));
+    expect(crmActionError(ArgumentError('Login band.')), 'Login band.');
   });
 }
 

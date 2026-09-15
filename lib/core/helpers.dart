@@ -28,13 +28,30 @@ Future<void> runCrmAction(
   } catch (error) {
     if (error is MutationCancelled) return;
     if (context.mounted) {
-      showAppNotice(
-        context,
-        'Amal bajarilmadi. Ulanish va ruxsatlarni tekshirib, qayta urinib ko‘ring.',
-        isError: true,
-      );
+      showAppNotice(context, crmActionError(error), isError: true);
     }
   }
+}
+
+/// The text a failed action shows. A StateError or ArgumentError the app
+/// raised itself already says what went wrong, in Uzbek, so it is shown as
+/// written; anything else gets the general advice.
+String crmActionError(Object error) {
+  final message = switch (error) {
+    ArgumentError(:final message) => '$message',
+    StateError(:final message) => message,
+    _ => '',
+  };
+  // Dart's own lookup failures ("No element", "Too many elements") are not
+  // written for anyone to read.
+  if (message.isEmpty ||
+      message.startsWith('No element') ||
+      message.startsWith('Too many elements') ||
+      message.startsWith('Bad state')) {
+    return 'Amal bajarilmadi. Ulanish va ruxsatlarni tekshirib, '
+        'qayta urinib ko‘ring.';
+  }
+  return message;
 }
 
 /// Keep form controllers alive until the dialog's closing animation finishes.

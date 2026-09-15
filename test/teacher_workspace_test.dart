@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jadid_crm/core/migration.dart';
 import 'package:jadid_crm/data/crm_store.dart';
 import 'package:jadid_crm/data/models.dart';
 import 'package:jadid_crm/features/people_page.dart';
@@ -430,5 +431,148 @@ void main() {
     expect(find.textContaining('Parol juda qisqa'), findsOneWidget);
     expect(find.textContaining('Authentication'), findsOneWidget);
     expect(find.textContaining('Password should be'), findsNothing);
+  });
+
+  test('an admin removes a member; anyone else is refused', () async {
+    final backend = FakeCrmBackend();
+    await backend.signIn();
+    final store = CrmStore.online(backend.client, enableLiveUpdates: false);
+    addTearDown(store.dispose);
+    await store.load();
+    final pupil = store.users.firstWhere((u) => u.role == AppRole.student);
+
+    store.activeRole = AppRole.teacher;
+    await expectLater(store.deleteMember(pupil.id), throwsStateError);
+    expect(backend.deletedMembers, isEmpty);
+
+    store.activeRole = AppRole.admin;
+    // Removing yourself would lock the centre's only admin out.
+    await expectLater(
+      store.deleteMember(store.activeUser.id),
+      throwsStateError,
+    );
+    expect(backend.deletedMembers, isEmpty);
+
+    await store.deleteMember(pupil.id);
+    expect(backend.deletedMembers, [int.parse(pupil.membershipId)]);
+    expect(store.users.any((u) => u.id == pupil.id), isFalse);
+  });
+
+  test(
+    'removal without the migration offers the SQL, not a raw error',
+    () async {
+      final backend = FakeCrmBackend()..missingFunctions.add('delete_member');
+      await backend.signIn();
+      final store = CrmStore.online(backend.client, enableLiveUpdates: false);
+      addTearDown(store.dispose);
+      await store.load();
+      store.activeRole = AppRole.admin;
+      final pupil = store.users.firstWhere((u) => u.role == AppRole.student);
+      await expectLater(
+        store.deleteMember(pupil.id),
+        throwsA(isA<MigrationMissing>()),
+      );
+      // Still listed: a refused removal must not look like it worked.
+      expect(store.users.any((u) => u.id == pupil.id), isTrue);
+    },
+  );
+
+  test('the homework badge counts what the viewer owes', () async {
+    final store = CrmStore();
+    addTearDown(store.dispose);
+    final group = store.groups.first;
+    final pupil = store.students.firstWhere((s) => s.groupId == group.id);
+    store.homeworks
+      ..clear()
+      ..addAll([
+        Homework(
+          id: 'h1',
+          groupId: group.id,
+          title: 'Bajarilgan',
+          description: '',
+          dueDate: DateTime.now(),
+        ),
+        Homework(
+          id: 'h2',
+          groupId: group.id,
+          title: 'Tekshiriladi',
+          description: '',
+          dueDate: DateTime.now(),
+        ),
+        Homework(
+          id: 'h3',
+          groupId: group.id,
+          title: 'Yuborilmagan',
+          description: '',
+          dueDate: DateTime.now(),
+        ),
+      ]);
+    store.results
+      ..clear()
+      ..addAll([
+        HomeworkResult(
+          homeworkId: 'h1',
+          studentId: pupil.id,
+          status: HomeworkStatus.accepted,
+        ),
+        HomeworkResult(
+          homeworkId: 'h2',
+          studentId: pupil.id,
+          status: HomeworkStatus.submitted,
+        ),
+      ]);
+
+    // The pupil owes only the one never sent; h2 is out of their hands.
+    store.activeRole = AppRole.student;
+    expect(store.pendingHomeworkCount(pupil.id), 1);
+
+    // The teacher owes the one waiting to be marked.
+    store.activeRole = AppRole.teacher;
+    expect(store.unreviewedHomeworkCount(), 1);
+    expect(store.homeworkBadgeCount(), 1);
+  });
+
+  test('points split into homework and attendance', () async {
+    final store = CrmStore();
+    addTearDown(store.dispose);
+    final group = store.groups.first;
+    final pupil = store.students.firstWhere((s) => s.groupId == group.id);
+    store.lessons
+      ..clear()
+      ..add(
+        Lesson(
+          id: 'l1',
+          groupId: group.id,
+          topic: 'Dars',
+          startsAt: DateTime.now(),
+        ),
+      );
+    store.attendance['l1'] = {pupil.id: AttendanceStatus.present};
+    store.homeworks
+      ..clear()
+      ..add(
+        Homework(
+          id: 'h1',
+          groupId: group.id,
+          title: 'Vazifa',
+          description: '',
+          dueDate: DateTime.now(),
+        ),
+      );
+    store.results
+      ..clear()
+      ..add(
+        HomeworkResult(
+          homeworkId: 'h1',
+          studentId: pupil.id,
+          status: HomeworkStatus.accepted,
+          score: 4,
+        ),
+      );
+
+    expect(store.homeworkPointsOf(pupil.id), 4);
+    expect(store.attendancePointsOf(pupil.id), 10);
+    // The columns must still add up to what the pupil had before.
+    expect(store.lessonPointsOf(pupil.id), 14);
   });
 }

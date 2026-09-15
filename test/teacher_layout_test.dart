@@ -237,8 +237,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Lesson points, reward, penalty and total each get their own column.
-    for (final header in ['Dars ballari', 'Rag‘bat', 'Jarima', 'Jami']) {
+    // Homework, attendance, reward, penalty and total each get a column.
+    for (final header in [
+      'Uy vazifa',
+      'Darsda qatnashish',
+      'Rag‘bat',
+      'Jarima',
+      'Jami',
+    ]) {
       expect(find.text(header), findsOneWidget);
     }
     expect(find.text('10'), findsOneWidget);

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
 
 import '../core/app_notice.dart';
+import '../core/migration.dart';
+import '../core/migration_setup.dart';
 import '../core/app_theme.dart';
 import '../core/app_icon.dart';
 import '../core/helpers.dart';
@@ -60,7 +62,28 @@ class PeoplePage extends StatelessWidget {
               contentPadding: const EdgeInsets.symmetric(vertical: 5),
               onTap: () => _open(context, teacher.id),
               leading: UserAvatar(store: store, user: teacher),
-              trailing: const AppIcon('edit', size: 21),
+              trailing: store.isOnline && store.activeRole == AppRole.admin
+                  ? PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'profile') _open(context, teacher.id);
+                        if (value == 'delete')
+                          _deleteMember(context, store, teacher);
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'profile',
+                          child: Row(
+                            children: [
+                              AppIcon('edit', size: 20),
+                              SizedBox(width: 10),
+                              Text('Profilni tahrirlash'),
+                            ],
+                          ),
+                        ),
+                        _deleteItem(),
+                      ],
+                    )
+                  : const AppIcon('edit', size: 21),
               title: Text(
                 teacher.name,
                 style: const TextStyle(fontWeight: FontWeight.w600),
@@ -159,6 +182,12 @@ class PeoplePage extends StatelessWidget {
                             context,
                             () => store.setRole(student.id, AppRole.teacher),
                           );
+                        if (value == 'delete')
+                          _deleteMember(
+                            context,
+                            store,
+                            store.users.firstWhere((u) => u.id == student.id),
+                          );
                       },
                       itemBuilder: (_) => [
                         const PopupMenuItem(
@@ -180,6 +209,7 @@ class PeoplePage extends StatelessWidget {
                           value: 'teacher',
                           child: Text('Ustoz rolini berish'),
                         ),
+                        _deleteItem(),
                       ],
                     )
                   : const AppIcon('edit', size: 21),
@@ -511,4 +541,68 @@ bool _saysShortPassword(String message) {
 bool _saysTaken(String message) {
   final text = message.toLowerCase();
   return text.contains('already registered') || text.contains('already exists');
+}
+
+PopupMenuItem<String> _deleteItem() => const PopupMenuItem(
+  value: 'delete',
+  child: Row(
+    children: [
+      Icon(Icons.delete_outline_rounded, size: 20, color: AppColors.danger),
+      SizedBox(width: 10),
+      Text('O‘chirish', style: TextStyle(color: AppColors.danger)),
+    ],
+  ),
+);
+
+/// Removes a person from the centre, after naming exactly what goes with
+/// them — this cannot be undone from the app.
+Future<void> _deleteMember(
+  BuildContext context,
+  CrmStore store,
+  AppUser user,
+) async {
+  final teacher = user.role == AppRole.teacher;
+  final groups = store.groups.where((g) => g.teacherId == user.id).length;
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      icon: const Icon(Icons.warning_amber_rounded, color: AppColors.danger),
+      title: Text('${user.name}ni o‘chirasizmi?'),
+      content: SizedBox(
+        width: 420,
+        child: Text(
+          teacher
+              ? 'Ustoz ro‘yxatdan butunlay o‘chadi.'
+                    '${groups == 0 ? '' : ' $groups ta guruh ustozsiz qoladi — '
+                              'keyin boshqa ustoz biriktirasiz.'}'
+                    ' U belgilagan davomat va bergan vazifalar guruhda qoladi.'
+              : 'O‘quvchi ro‘yxatdan butunlay o‘chadi. Davomati, uy vazifalari, '
+                    'ballari va to‘lovlari ham o‘chadi.\n\nBu amalni '
+                    'qaytarib bo‘lmaydi.',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Bekor qilish'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('O‘chirish'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  try {
+    await store.deleteMember(user.id);
+    if (context.mounted) showAppNotice(context, '${user.name} o‘chirildi');
+  } on MigrationMissing catch (missing) {
+    if (context.mounted) await showMigrationSetup(context, missing);
+  } catch (error) {
+    if (context.mounted) {
+      showAppNotice(context, crmActionError(error), isError: true);
+    }
+  }
 }

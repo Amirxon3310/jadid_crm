@@ -4,6 +4,7 @@ import 'dashboard_metrics.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/app_config.dart';
+import '../core/migration.dart';
 import 'auth_service.dart';
 import 'models.dart';
 import 'student_portal.dart';
@@ -508,6 +509,9 @@ class CrmStore extends ChangeNotifier {
           status: _homework(row['status'].toString()),
           score: row['score'] as int?,
           comment: row['comment'].toString(),
+          // Absent until the answer-file migration runs.
+          filePath: row['file_path'] as String?,
+          fileName: row['file_name'] as String?,
         ),
       );
     }
@@ -717,8 +721,10 @@ class CrmStore extends ChangeNotifier {
   Future<void> submitHomework(
     String homeworkId,
     String studentId,
-    String answer,
-  ) async {
+    String answer, {
+    Uint8List? fileBytes,
+    String? fileName,
+  }) async {
     final homework = homeworks.firstWhere((h) => h.id == resolveId(homeworkId));
     if (!studentById(studentId, homework.groupId).active ||
         !groupById(homework.groupId).active)
@@ -726,17 +732,38 @@ class CrmStore extends ChangeNotifier {
     if (resultFor(homeworkId, studentId).status == HomeworkStatus.accepted) {
       throw StateError('Qabul qilingan javobni o‘zgartirib bo‘lmaydi.');
     }
+    // The answer file sits beside the task sheet, under an `answers` folder
+    // so a group's own uploads stay apart from the teacher's.
+    var path = fileBytes == null
+        ? null
+        : '${groupById(homework.groupId).organizationId}'
+              '/${resolveId(homework.groupId)}/answers'
+              '/${DateTime.now().microsecondsSinceEpoch}_$fileName';
     await _mutate<void>(
       apply: () {
         if (!homeworks.any((h) => h.id == resolveId(homeworkId)))
           throw StateError('Vazifa saqlanmadi.');
-        resultFor(homeworkId, studentId)
+        final result = resultFor(homeworkId, studentId)
           ..answer = answer
           ..status = HomeworkStatus.submitted
           ..score = null
           ..comment = '';
+        if (fileBytes != null) {
+          result
+            ..filePath = path
+            ..fileName = fileName;
+        }
       },
       send: () async {
+        if (path != null) {
+          path =
+              '${groupById(homework.groupId).organizationId}'
+              '/${_serverId(homework.groupId)}/answers'
+              '/${DateTime.now().microsecondsSinceEpoch}_$fileName';
+          await client!.storage
+              .from('homework-files')
+              .uploadBinary(path!, fileBytes!);
+        }
         await client!.from('assignment_results').upsert({
           'organization_id': groupById(homework.groupId).organizationId,
           'assignment_id': _serverId(homeworkId),
@@ -750,6 +777,7 @@ class CrmStore extends ChangeNotifier {
           'reviewed_at': null,
           'comment': '',
           'submitted_at': DateTime.now().toUtc().toIso8601String(),
+          if (path != null) ...{'file_path': path, 'file_name': fileName},
         }, onConflict: 'assignment_id,enrollment_id');
       },
     );
@@ -985,6 +1013,29 @@ class CrmStore extends ChangeNotifier {
       );
     } finally {
       await signUp.dispose();
+    }
+    await load();
+    notifyListeners();
+  }
+
+  /// Removes a pupil or a teacher from the centre. The server decides who is
+  /// allowed and hands the removed teacher's signatures to the acting admin,
+  /// so a group's own record survives the removal.
+  Future<void> deleteMember(String userId) async {
+    if (activeRole != AppRole.admin) throw StateError('Admin huquqi kerak.');
+    if (!isOnline) throw UnsupportedError('O‘chirish faqat serverda ishlaydi.');
+    final user = users.firstWhere((u) => u.id == userId);
+    if (user.id == activeUser.id)
+      throw StateError('O‘zingizni o‘chira olmaysiz.');
+    try {
+      await client!.rpc(
+        'delete_member',
+        params: {'p_membership_id': int.parse(user.membershipId)},
+      );
+    } on PostgrestException catch (error) {
+      // PGRST202: the function is not in the schema cache yet.
+      if (error.code == 'PGRST202') throw memberRemovalMigration;
+      rethrow;
     }
     await load();
     notifyListeners();

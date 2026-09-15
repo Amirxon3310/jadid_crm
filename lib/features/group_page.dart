@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../core/app_notice.dart';
 import '../core/app_theme.dart';
+import '../core/migration.dart';
+import '../core/migration_setup.dart';
 import '../core/app_icon.dart';
 import '../core/helpers.dart';
 import '../core/user_avatar.dart';
@@ -1004,11 +1005,8 @@ class _HomeworkCard extends StatelessWidget {
         if (homework.filePath != null) ...[
           const SizedBox(height: 6),
           TextButton.icon(
-            onPressed: () => runCrmAction(context, () async {
-              final url = await store.homeworkFileUrl(homework.filePath!);
-              if (!context.mounted) return;
-              await launchUrl(Uri.parse(url));
-            }),
+            onPressed: () =>
+                _openHomeworkFile(context, store, homework.filePath!),
             icon: const Icon(Icons.attach_file_outlined, size: 18),
             label: Text(homework.fileName ?? 'Fayl'),
           ),
@@ -1036,9 +1034,9 @@ class _StudentHomework extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            _homeworkLabel(result.status),
+            homeworkStatusLabel(result.status),
             style: TextStyle(
-              color: _homeworkColor(result.status),
+              color: homeworkStatusColor(result.status),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1055,55 +1053,92 @@ class _StudentHomework extends StatelessWidget {
 
   Future<void> _submit(BuildContext context, HomeworkResult result) async {
     final answer = TextEditingController(text: result.answer);
+    final locked =
+        result.status == HomeworkStatus.accepted ||
+        !store.studentById(store.activeUser.id, homework.groupId).active ||
+        !store.groupById(homework.groupId).active;
+    Uint8List? fileBytes;
+    String? fileName;
     final sent = await showFormDialog<bool>(
       context: context,
       onDisposed: answer.dispose,
-      builder: (context) => AlertDialog(
-        title: Text(homework.title),
-        content: SizedBox(
-          width: 480,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: answer,
-                readOnly:
-                    result.status == HomeworkStatus.accepted ||
-                    !store
-                        .studentById(store.activeUser.id, homework.groupId)
-                        .active ||
-                    !store.groupById(homework.groupId).active,
-                maxLines: 5,
-                decoration: const InputDecoration(labelText: 'Javobingiz'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) => AlertDialog(
+          title: Text(homework.title),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: answer,
+                    readOnly: locked,
+                    maxLines: 5,
+                    decoration: const InputDecoration(labelText: 'Javobingiz'),
+                  ),
+                  const SizedBox(height: 6),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    enabled: !locked,
+                    leading: const Icon(Icons.attach_file_outlined),
+                    title: Text(
+                      fileName ??
+                          result.fileName ??
+                          'Fayl biriktirish (ixtiyoriy)',
+                    ),
+                    subtitle: fileName == null && result.fileName != null
+                        ? const Text(
+                            'Yangi fayl tanlasangiz, shu fayl almashadi.',
+                          )
+                        : null,
+                    trailing: fileName == null
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () => update(() {
+                              fileBytes = null;
+                              fileName = null;
+                            }),
+                          ),
+                    onTap: locked
+                        ? null
+                        : () async {
+                            final file = await FilePicker.pickFile();
+                            if (file == null) return;
+                            final bytes = await file.readAsBytes();
+                            update(() {
+                              fileBytes = bytes;
+                              fileName = file.name;
+                            });
+                          },
+                  ),
+                  if (result.comment.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text('Ustoz izohi: ${result.comment}'),
+                  ],
+                ],
               ),
-              if (result.comment.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text('Ustoz izohi: ${result.comment}'),
-              ],
-            ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Yopish'),
+            ),
+            FilledButton(
+              onPressed: locked
+                  ? null
+                  : () {
+                      // A file on its own is an answer too.
+                      if (answer.text.trim().isNotEmpty || fileBytes != null)
+                        Navigator.pop(context, true);
+                    },
+              child: const Text('Yuborish'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Yopish'),
-          ),
-          FilledButton(
-            onPressed:
-                result.status == HomeworkStatus.accepted ||
-                    !store
-                        .studentById(store.activeUser.id, homework.groupId)
-                        .active ||
-                    !store.groupById(homework.groupId).active
-                ? null
-                : () {
-                    if (answer.text.trim().isNotEmpty)
-                      Navigator.pop(context, true);
-                  },
-            child: const Text('Yuborish'),
-          ),
-        ],
       ),
     );
     if (sent == true && context.mounted)
@@ -1113,11 +1148,25 @@ class _StudentHomework extends StatelessWidget {
           homework.id,
           store.activeUser.id,
           answer.text.trim(),
+          fileBytes: fileBytes,
+          fileName: fileName,
         ),
         success: 'Javob yuborildi',
       );
   }
 }
+
+/// Opens a stored homework file — the teacher's task sheet or a pupil's
+/// answer — through a short-lived signed link.
+Future<void> _openHomeworkFile(
+  BuildContext context,
+  CrmStore store,
+  String path,
+) => runCrmAction(context, () async {
+  final url = await store.homeworkFileUrl(path);
+  if (!context.mounted) return;
+  await launchUrl(Uri.parse(url));
+});
 
 class _TeacherHomework extends StatelessWidget {
   const _TeacherHomework({
@@ -1143,10 +1192,10 @@ class _TeacherHomework extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 title: Text(student.name),
                 subtitle: Text(
-                  _homeworkLabel(result.status),
-                  style: TextStyle(color: _homeworkColor(result.status)),
+                  homeworkStatusLabel(result.status),
+                  style: TextStyle(color: homeworkStatusColor(result.status)),
                 ),
-                trailing: result.answer.isEmpty
+                trailing: result.answer.isEmpty && result.filePath == null
                     ? const Text(
                         'Javob yo‘q',
                         style: TextStyle(color: AppColors.muted),
@@ -1188,7 +1237,16 @@ class _TeacherHomework extends StatelessWidget {
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 6),
-                  SelectableText(result.answer),
+                  SelectableText(
+                    result.answer.isEmpty ? '— (faqat fayl)' : result.answer,
+                  ),
+                  if (result.filePath != null)
+                    TextButton.icon(
+                      onPressed: () =>
+                          _openHomeworkFile(context, store, result.filePath!),
+                      icon: const Icon(Icons.attach_file_outlined, size: 18),
+                      label: Text(result.fileName ?? 'Biriktirilgan fayl'),
+                    ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<int>(
                     initialValue: score,
@@ -1757,7 +1815,7 @@ class _JournalCell extends StatelessWidget {
           ? 'Davomat belgilanmagan'
           : _attendanceLabel(attendance!),
       if (homework != null && homeworkStatus != null)
-        'Uy vazifa: ${_homeworkLabel(homeworkStatus!)}',
+        'Uy vazifa: ${homeworkStatusLabel(homeworkStatus!)}',
     ];
     final mark = switch (attendance) {
       AttendanceStatus.present || AttendanceStatus.late => '+',
@@ -1804,15 +1862,16 @@ String _attendanceLabel(AttendanceStatus status) => switch (status) {
   AttendanceStatus.absent => 'Kelmadi',
 };
 
-String _homeworkLabel(HomeworkStatus status) => switch (status) {
+String homeworkStatusLabel(HomeworkStatus status) => switch (status) {
   HomeworkStatus.waiting => 'Bajarilmagan',
   HomeworkStatus.submitted => 'Tekshirilmoqda',
   HomeworkStatus.accepted => 'Qabul qilindi',
   HomeworkStatus.returned => 'Qaytarildi',
 };
 
-Color _homeworkColor(HomeworkStatus status) => switch (status) {
-  HomeworkStatus.waiting => AppColors.muted,
+Color homeworkStatusColor(HomeworkStatus status) => switch (status) {
+  // Not sent is a miss, not a neutral state: it reads red like a penalty.
+  HomeworkStatus.waiting => AppColors.penaltyRed,
   HomeworkStatus.submitted => AppColors.warning,
   HomeworkStatus.accepted => AppColors.rewardGreen,
   HomeworkStatus.returned => AppColors.danger,
@@ -1882,6 +1941,23 @@ List<Student> _visibleStudents(CrmStore store, String groupId) {
 
 /// A signed points figure as a badge: bright green above zero, bright red
 /// below, and a plain dash at zero so the board reads at a glance.
+/// Points earned by working, not granted: green when there are any, muted
+/// when the pupil has none yet.
+class _EarnedPoints extends StatelessWidget {
+  const _EarnedPoints(this.value);
+  final int value;
+  @override
+  Widget build(BuildContext context) => value == 0
+      ? const Text('—', style: TextStyle(color: AppColors.muted))
+      : Text(
+          '$value',
+          style: const TextStyle(
+            color: AppColors.rewardGreen,
+            fontWeight: FontWeight.w600,
+          ),
+        );
+}
+
 class _SignedPoints extends StatelessWidget {
   const _SignedPoints(this.value);
   final int value;
@@ -2087,8 +2163,9 @@ class _RankingTabState extends State<_RankingTab> {
                     columns: [
                       const DataColumn(label: Text('#')),
                       const DataColumn(label: Text('O‘quvchi')),
+                      const DataColumn(label: Text('Uy vazifa'), numeric: true),
                       const DataColumn(
-                        label: Text('Dars ballari'),
+                        label: Text('Darsda qatnashish'),
                         numeric: true,
                       ),
                       const DataColumn(label: Text('Rag‘bat'), numeric: true),
@@ -2147,12 +2224,11 @@ class _RankingTabState extends State<_RankingTab> {
                               ),
                             ),
                             DataCell(
-                              Text(
-                                '${store.lessonPointsOf(student.id)}',
-                                style: const TextStyle(
-                                  color: AppColors.rewardGreen,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              _EarnedPoints(store.homeworkPointsOf(student.id)),
+                            ),
+                            DataCell(
+                              _EarnedPoints(
+                                store.attendancePointsOf(student.id),
                               ),
                             ),
                             DataCell(
@@ -2465,7 +2541,8 @@ Future<void> showAddAward(
 ) {
   // Without the awards table there is nowhere to save to, so say what is
   // missing instead of opening a form that cannot succeed.
-  if (!store.scoreAwardsReady) return _showAwardsSetup(context);
+  if (!store.scoreAwardsReady)
+    return showMigrationSetup(context, scoreAwardsMigration);
   final amount = TextEditingController();
   final note = TextEditingController();
   return showFormDialog<void>(
@@ -2576,88 +2653,3 @@ Future<void> showAddAward(
 
 /// The awards table has to exist before points can be handed out. Rather
 /// than a button that does nothing, say which migration is missing.
-const _awardsMigrationAsset =
-    'supabase/migrations/20260916140000_score_awards.sql';
-
-Future<void> _showAwardsSetup(BuildContext context) => showDialog<void>(
-  context: context,
-  builder: (dialogContext) => AlertDialog(
-    icon: const Icon(Icons.storage_rounded, color: AppColors.warning),
-    title: const Text('Ball qo‘shish uchun bir marta sozlash'),
-    content: SizedBox(
-      width: 560,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Qo‘shimcha ball uchun bazada alohida jadval kerak, u hali '
-            'qo‘llanmagan. Quyidagi SQL’ni nusxalab, Supabase → SQL '
-            'Editor’ga qo‘ying va bir marta “Run” bosing. Keyin shu '
-            'sahifani yangilang.',
-          ),
-          const SizedBox(height: 14),
-          // Straight from the migration file, so what is copied here is
-          // exactly what the repository would apply.
-          FutureBuilder<String>(
-            future: rootBundle.loadString(_awardsMigrationAsset),
-            builder: (context, snapshot) {
-              final sql = snapshot.data;
-              if (sql == null) {
-                // A plain line rather than a spinner: nothing here should
-                // animate forever if the file cannot be read.
-                return const SizedBox(
-                  height: 60,
-                  child: Center(child: Text('SQL yuklanmoqda…')),
-                );
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    height: 220,
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.ink.withValues(alpha: .06),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: SingleChildScrollView(
-                      child: SelectableText(
-                        sql,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.rewardGreen,
-                    ),
-                    onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: sql));
-                      if (context.mounted) {
-                        showAppNotice(context, 'SQL nusxalandi');
-                      }
-                    },
-                    icon: const Icon(Icons.copy_rounded),
-                    label: const Text('SQL’ni nusxalash'),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(dialogContext),
-        child: const Text('Yopish'),
-      ),
-    ],
-  ),
-);

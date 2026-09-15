@@ -180,26 +180,70 @@ extension TeacherStore on CrmStore {
     }
   }
 
-  /// Points a pupil earned from lessons alone: 10 per attended lesson plus
-  /// the score of every accepted homework.
-  int lessonPointsOf(String userId) {
-    final homework = results
-        .where(
-          (r) => r.studentId == userId && r.status == HomeworkStatus.accepted,
-        )
-        .fold(0, (sum, r) => sum + (r.score ?? 0));
-    final attended = lessons
-        .where((l) => l.status != 'cancelled')
-        .where((l) {
-          final value = attendance[l.id]?[userId];
-          return value == AttendanceStatus.present ||
-              value == AttendanceStatus.late;
-        })
-        .map((l) => l.id)
-        .toSet()
-        .length;
-    return homework + attended * 10;
+  /// The score of every homework the pupil got accepted.
+  int homeworkPointsOf(String userId) => results
+      .where(
+        (r) => r.studentId == userId && r.status == HomeworkStatus.accepted,
+      )
+      .fold(0, (sum, r) => sum + (r.score ?? 0));
+
+  /// 10 points per lesson the pupil turned up for, late still counting.
+  int attendancePointsOf(String userId) =>
+      lessons
+          .where((l) => l.status != 'cancelled')
+          .where((l) {
+            final value = attendance[l.id]?[userId];
+            return value == AttendanceStatus.present ||
+                value == AttendanceStatus.late;
+          })
+          .map((l) => l.id)
+          .toSet()
+          .length *
+      10;
+
+  /// Points a pupil earned from lessons alone: attendance plus homework.
+  int lessonPointsOf(String userId) =>
+      homeworkPointsOf(userId) + attendancePointsOf(userId);
+
+  /// Homework the pupil still owes: never sent, or sent back to be redone.
+  int pendingHomeworkCount(String userId) {
+    final groupIds = groups
+        .where((g) => students.any((s) => s.id == userId && s.groupId == g.id))
+        .map((g) => g.id)
+        .toSet();
+    return homeworks.where((homework) {
+      if (!groupIds.contains(homework.groupId)) return false;
+      final status = _homeworkStatusFor(homework.id, userId);
+      return status == null ||
+          status == HomeworkStatus.waiting ||
+          status == HomeworkStatus.returned;
+    }).length;
   }
+
+  /// Answers waiting for the staff member to mark them.
+  int unreviewedHomeworkCount() {
+    final groupIds = visibleGroups.map((g) => g.id).toSet();
+    return homeworks
+        .where((homework) => groupIds.contains(homework.groupId))
+        .fold(
+          0,
+          (sum, homework) =>
+              sum +
+              studentsOf(homework.groupId)
+                  .where(
+                    (student) =>
+                        _homeworkStatusFor(homework.id, student.id) ==
+                        HomeworkStatus.submitted,
+                  )
+                  .length,
+        );
+  }
+
+  /// The red badge next to "Uy vazifalari": what this person owes, or what
+  /// they owe the group. Zero means no badge.
+  int homeworkBadgeCount() => activeRole == AppRole.student
+      ? pendingHomeworkCount(activeUser.id)
+      : unreviewedHomeworkCount();
 
   List<ScoreAward> awardsOf(String userId) =>
       scoreAwards.where((a) => a.studentId == userId).toList()
