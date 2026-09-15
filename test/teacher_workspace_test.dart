@@ -228,4 +228,43 @@ void main() {
       );
     },
   );
+
+  test('lesson window is read in Tashkent time, not the device zone', () {
+    final store = CrmStore();
+    addTearDown(store.dispose);
+    final group = store.groups.first.copyWith(
+      weekDays: const [1, 2, 3, 4, 5, 6, 7],
+      lessonStartTime: '15:30',
+      lessonEndTime: '17:00',
+    );
+    // 15:30 in Tashkent is 10:30 UTC; the check must land inside the window
+    // whatever zone the device is in, and stay outside it an hour later.
+    expect(
+      store.isScheduledNow(group, now: DateTime.utc(2026, 9, 16, 10, 30)),
+      isTrue,
+    );
+    expect(
+      store.isScheduledNow(group, now: DateTime.utc(2026, 9, 16, 11, 59)),
+      isTrue,
+    );
+    expect(
+      store.isScheduledNow(group, now: DateTime.utc(2026, 9, 16, 12, 1)),
+      isFalse,
+    );
+    expect(
+      store.isScheduledNow(group, now: DateTime.utc(2026, 9, 16, 9, 59)),
+      isFalse,
+    );
+    // Without a configured window only the weekday matters.
+    final open = group.copyWith(lessonStartTime: '', lessonEndTime: '');
+    expect(
+      store.isScheduledNow(open, now: DateTime.utc(2026, 9, 16, 3)),
+      isTrue,
+    );
+    final otherDay = group.copyWith(weekDays: const [7]);
+    expect(
+      store.isScheduledNow(otherDay, now: DateTime.utc(2026, 9, 16, 10, 30)),
+      isFalse,
+    );
+  });
 }
