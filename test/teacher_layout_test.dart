@@ -77,12 +77,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      for (final label in [
-        'Davomat',
-        'Uy vazifalari',
-        'Jurnal',
-        'Reyting',
-      ]) {
+      for (final label in ['Davomat', 'Uy vazifalari', 'Jurnal', 'Reyting']) {
         final tab = find.widgetWithText(TextButton, label);
         await tester.ensureVisible(tab);
         await tester.tap(tab);
@@ -90,9 +85,7 @@ void main() {
         expect(tester.takeException(), isNull, reason: label);
         if (label == 'Davomat') {
           expect(find.text('Suratga tushish'), findsOneWidget);
-          final switcher = tester
-              .widgetList<Switch>(find.byType(Switch))
-              .first;
+          final switcher = tester.widgetList<Switch>(find.byType(Switch)).first;
           expect(switcher.onChanged, isNull);
         }
         if (label == 'Uy vazifalari') {
@@ -151,6 +144,63 @@ void main() {
     expect(find.text('Guruhni tahrirlash'), findsOneWidget);
     await tester.tap(find.text('Bekor qilish'));
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('journal ranks pupils and reports counts with a percentage', (
+    tester,
+  ) async {
+    final store = CrmStore();
+    addTearDown(store.dispose);
+    store.users.addAll([
+      const AppUser(
+        id: 'student-2',
+        name: 'Madina Salimova',
+        role: AppRole.student,
+      ),
+      const AppUser(
+        id: 'student-3',
+        name: 'Aziz Rustamov',
+        role: AppRole.student,
+      ),
+    ]);
+    final lessons = store.lessonsOf('g1');
+    expect(lessons.length, greaterThanOrEqualTo(2));
+    // Deliberately the reverse of the pupils' natural order, so the ranking
+    // has to do real work for the expectations below to hold.
+    store.attendance
+      ..clear()
+      ..addAll({
+        for (final lesson in lessons)
+          lesson.id: {
+            'student-3': AttendanceStatus.present,
+            'student-1': AttendanceStatus.absent,
+          },
+      });
+    // Only the first lesson for the middle pupil, so the ranking is decided.
+    store.attendance[lessons.first.id]!['student-2'] = AttendanceStatus.late;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: GroupPage(store: store, group: store.groups.first, startTab: 3),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Whole history by default, counts shown as "done / total (share)".
+    expect(find.text('Hammasi'), findsOneWidget);
+    expect(
+      find.text('${lessons.length} / ${lessons.length} (100 %)'),
+      findsOneWidget,
+    );
+    expect(find.text('0 / ${lessons.length} (0 %)'), findsWidgets);
+
+    // Best attendance on top, worst at the bottom.
+    double yOf(String name) => tester.getTopLeft(find.text(name)).dy;
+    expect(yOf('Aziz Rustamov'), lessThan(yOf('Madina Salimova')));
+    expect(yOf('Madina Salimova'), lessThan(yOf('Ali Karimov')));
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

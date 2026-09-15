@@ -200,17 +200,15 @@ class _GroupPageState extends State<GroupPage> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                // The journal's per-lesson columns need the full width; every
-                // other tab stays centered and capped for readability.
-                child: labels[tab] == 'Jurnal'
-                    ? pages[tab]
-                    : Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 1200),
-                          child: pages[tab],
-                        ),
-                      ),
+                // Same 16px gutter and 1200 cap as the header bar above, so
+                // every tab lines up with it exactly.
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: pages[tab],
+                  ),
+                ),
               ),
             ),
           ],
@@ -1322,39 +1320,55 @@ class _JournalTabState extends State<_JournalTab> {
     Homework? homeworkFor(Lesson lesson) =>
         homeworks.where((h) => h.lessonId == lesson.id).firstOrNull;
 
-    final attendanceRate = <String, double?>{};
-    final homeworkRate = <String, double?>{};
+    final attendanceScore = <String, ({int done, int total})>{};
+    final homeworkScore = <String, ({int done, int total})>{};
     for (final student in students) {
+      // Only lessons the student was actually enrolled for count against them.
       final applicable = lessons
           .where((l) => student.enrolledOn(l.startsAt))
           .toList();
-      attendanceRate[student.id] = applicable.isEmpty
-          ? null
-          : applicable.where((l) {
-                  final status = store.attendance[l.id]?[student.id];
-                  return status == AttendanceStatus.present ||
-                      status == AttendanceStatus.late;
-                }).length *
-                100 /
-                applicable.length;
-      homeworkRate[student.id] = homeworks.isEmpty
-          ? null
-          : homeworks
-                    .where(
-                      (h) =>
-                          store.resultFor(h.id, student.id).status ==
-                          HomeworkStatus.accepted,
-                    )
-                    .length *
-                100 /
-                homeworks.length;
+      attendanceScore[student.id] = (
+        done: applicable.where((l) {
+          final status = store.attendance[l.id]?[student.id];
+          return status == AttendanceStatus.present ||
+              status == AttendanceStatus.late;
+        }).length,
+        total: applicable.length,
+      );
+      final ownHomework = homeworks
+          .where(
+            (h) => students.any(
+              (s) =>
+                  s.id == student.id &&
+                  lessons.any(
+                    (l) => l.id == h.lessonId && student.enrolledOn(l.startsAt),
+                  ),
+            ),
+          )
+          .toList();
+      homeworkScore[student.id] = (
+        done: ownHomework
+            .where(
+              (h) =>
+                  store.resultFor(h.id, student.id).status ==
+                  HomeworkStatus.accepted,
+            )
+            .length,
+        total: ownHomework.length,
+      );
     }
+    double percentOf(({int done, int total}) score) =>
+        score.total == 0 ? 0 : score.done * 100 / score.total;
     final sortedStudents = [...students]
       ..sort((a, b) {
         final scoreA =
-            ((attendanceRate[a.id] ?? 0) + (homeworkRate[a.id] ?? 0)) / 2;
+            (percentOf(attendanceScore[a.id]!) +
+                percentOf(homeworkScore[a.id]!)) /
+            2;
         final scoreB =
-            ((attendanceRate[b.id] ?? 0) + (homeworkRate[b.id] ?? 0)) / 2;
+            (percentOf(attendanceScore[b.id]!) +
+                percentOf(homeworkScore[b.id]!)) /
+            2;
         return scoreB.compareTo(scoreA);
       });
 
@@ -1415,24 +1429,24 @@ class _JournalTabState extends State<_JournalTab> {
           Wrap(
             spacing: 16,
             runSpacing: 6,
-            children: [
+            children: const [
               _JournalLegend(
-                icon: Icons.check_circle,
+                mark: '+',
                 color: AppColors.success,
                 label: 'Keldi',
               ),
               _JournalLegend(
-                icon: Icons.schedule,
+                mark: '+',
                 color: AppColors.warning,
                 label: 'Kechikdi',
               ),
               _JournalLegend(
-                icon: Icons.cancel,
+                mark: '−',
                 color: AppColors.danger,
                 label: 'Kelmadi',
               ),
               _JournalLegend(
-                icon: Icons.remove_circle_outline,
+                mark: '·',
                 color: AppColors.muted,
                 label: 'Belgilanmagan',
               ),
@@ -1443,10 +1457,15 @@ class _JournalTabState extends State<_JournalTab> {
               ),
               _JournalLegend(
                 icon: Icons.check_circle,
+                color: AppColors.success,
+                label: 'Vazifa qabul qilingan',
+              ),
+              _JournalLegend(
+                icon: Icons.check_circle,
                 color: AppColors.danger,
                 label: 'Vazifa yuborilmagan/qaytarilgan',
               ),
-              const _JournalSwatchLegend(label: 'Guruhda yo‘q edi'),
+              _JournalSwatchLegend(label: 'Guruhda yo‘q edi'),
             ],
           ),
           const SizedBox(height: 18),
@@ -1465,15 +1484,17 @@ class _JournalTabState extends State<_JournalTab> {
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minWidth: constraints.maxWidth),
                   child: DataTable(
-                    columnSpacing: 20,
+                    columnSpacing: 18,
+                    headingRowHeight: 64,
                     columns: [
                       const DataColumn(label: Text('#')),
                       const DataColumn(label: Text('O‘quvchi')),
-                      for (final lesson in lessons)
+                      for (final (index, lesson) in lessons.indexed)
                         DataColumn(
-                          label: Tooltip(
-                            message: lesson.topic,
-                            child: Text(shortDate(lesson.startsAt)),
+                          label: _LessonColumnLabel(
+                            index: index + 1,
+                            lesson: lesson,
+                            endTime: group.lessonEndTime,
                           ),
                         ),
                       const DataColumn(label: Text('Davomat'), numeric: true),
@@ -1526,20 +1547,8 @@ class _JournalTabState extends State<_JournalTab> {
                                                   .status,
                                       ),
                               ),
-                            DataCell(
-                              Text(
-                                attendanceRate[student.id] == null
-                                    ? '—'
-                                    : '${attendanceRate[student.id]!.round()}%',
-                              ),
-                            ),
-                            DataCell(
-                              Text(
-                                homeworkRate[student.id] == null
-                                    ? '—'
-                                    : '${homeworkRate[student.id]!.round()}%',
-                              ),
-                            ),
+                            DataCell(_ScoreText(attendanceScore[student.id]!)),
+                            DataCell(_ScoreText(homeworkScore[student.id]!)),
                           ],
                         ),
                     ],
@@ -1553,20 +1562,36 @@ class _JournalTabState extends State<_JournalTab> {
   }
 }
 
+/// One legend entry: either the glyph a cell prints, or the icon it corners.
 class _JournalLegend extends StatelessWidget {
   const _JournalLegend({
-    required this.icon,
+    this.icon,
+    this.mark,
     required this.color,
     required this.label,
-  });
-  final IconData icon;
+  }) : assert(icon != null || mark != null, 'needs an icon or a mark');
+  final IconData? icon;
+  final String? mark;
   final Color color;
   final String label;
   @override
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(icon, size: 15, color: color),
+      SizedBox(
+        width: 15,
+        child: mark == null
+            ? Icon(icon, size: 15, color: color)
+            : Text(
+                mark!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+      ),
       const SizedBox(width: 5),
       Text(label, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
     ],
@@ -1612,8 +1637,82 @@ class _JournalAbsentCell extends StatelessWidget {
   );
 }
 
-/// One lesson's cell in the journal: attendance on top, and — only when a
-/// homework is linked to that lesson — its status underneath.
+const _uzMonthsShort = [
+  'Yan',
+  'Fev',
+  'Mar',
+  'Apr',
+  'May',
+  'Iyn',
+  'Iyl',
+  'Avg',
+  'Sen',
+  'Okt',
+  'Noy',
+  'Dek',
+];
+
+String _hhmm(DateTime value) =>
+    '${value.hour.toString().padLeft(2, '0')}:'
+    '${value.minute.toString().padLeft(2, '0')}';
+
+/// A lesson column's heading: its number in the period, the date, and the
+/// time range, stacked the way a paper journal lists its sessions.
+class _LessonColumnLabel extends StatelessWidget {
+  const _LessonColumnLabel({
+    required this.index,
+    required this.lesson,
+    required this.endTime,
+  });
+  final int index;
+  final Lesson lesson;
+  final String endTime;
+  @override
+  Widget build(BuildContext context) {
+    final start = tashkentDate(lesson.startsAt);
+    return Tooltip(
+      message: lesson.topic,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            '$index',
+            style: const TextStyle(fontSize: 11, color: AppColors.muted),
+          ),
+          Text(
+            '${start.day}-${_uzMonthsShort[start.month - 1]}',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+          Text(
+            endTime.isEmpty ? _hhmm(start) : '${_hhmm(start)} - $endTime',
+            style: const TextStyle(fontSize: 10, color: AppColors.muted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "9 / 9 (100 %)" — the count first, the share of it second.
+class _ScoreText extends StatelessWidget {
+  const _ScoreText(this.score);
+  final ({int done, int total}) score;
+  @override
+  Widget build(BuildContext context) {
+    if (score.total == 0) {
+      return const Text('—', style: TextStyle(color: AppColors.muted));
+    }
+    final percent = (score.done * 100 / score.total).round();
+    return Text(
+      '${score.done} / ${score.total} ($percent %)',
+      style: const TextStyle(fontWeight: FontWeight.w600),
+    );
+  }
+}
+
+/// One lesson's cell: the attendance mark in the middle, with the homework
+/// marker tucked into the corner when that lesson carries one.
 class _JournalCell extends StatelessWidget {
   const _JournalCell({
     required this.attendance,
@@ -1632,25 +1731,40 @@ class _JournalCell extends StatelessWidget {
       if (homework != null && homeworkStatus != null)
         'Uy vazifa: ${_homeworkLabel(homeworkStatus!)}',
     ];
+    final mark = switch (attendance) {
+      AttendanceStatus.present || AttendanceStatus.late => '+',
+      AttendanceStatus.absent => '−',
+      null => '·',
+    };
     return Tooltip(
       message: parts.join(' • '),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            _attendanceIcon(attendance),
-            size: 18,
-            color: _attendanceColor(attendance),
-          ),
-          if (homework != null) ...[
-            const SizedBox(height: 3),
-            Icon(
-              Icons.check_circle,
-              size: 13,
-              color: _journalHomeworkColor(homeworkStatus!),
+      child: SizedBox(
+        width: 38,
+        height: 30,
+        child: Stack(
+          children: [
+            Center(
+              child: Text(
+                mark,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: _attendanceColor(attendance),
+                ),
+              ),
             ),
+            if (homework != null)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Icon(
+                  Icons.check_circle,
+                  size: 12,
+                  color: _journalHomeworkColor(homeworkStatus!),
+                ),
+              ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -1681,13 +1795,6 @@ Color _attendanceColor(AttendanceStatus? status) => switch (status) {
   AttendanceStatus.late => AppColors.warning,
   AttendanceStatus.absent => AppColors.danger,
   null => AppColors.muted,
-};
-
-IconData _attendanceIcon(AttendanceStatus? status) => switch (status) {
-  AttendanceStatus.present => Icons.check_circle,
-  AttendanceStatus.late => Icons.schedule,
-  AttendanceStatus.absent => Icons.cancel,
-  null => Icons.remove_circle_outline,
 };
 
 /// Why a teacher can't start/mark today's lesson right now.
