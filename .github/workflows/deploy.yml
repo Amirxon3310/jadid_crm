@@ -1,0 +1,50 @@
+# Builds the web app and publishes it to GitHub Pages on every push to main.
+#
+# One setting is needed once, in the repository: Settings → Pages → Source →
+# "GitHub Actions". Nothing else; the build runs on GitHub, so no keys or
+# tooling are needed on anyone's machine.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A newer push supersedes one still building.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.41.2
+      - run: flutter pub get
+      # The site is not published if it does not analyse and pass its tests.
+      - run: flutter analyze
+      - run: flutter test
+      # The site lives under /jadid_crm/, so every asset path must start there.
+      - run: flutter build web --release --base-href=/jadid_crm/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

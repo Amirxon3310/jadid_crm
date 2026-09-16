@@ -1352,13 +1352,15 @@ class CrmStore extends ChangeNotifier {
                   ),
                 ))
             .call();
+    String? createdId;
     try {
-      await AuthService(signUp).register(
+      final response = await AuthService(signUp).register(
         login: login,
         password: password,
         name: name.trim(),
         role: role.name,
       );
+      createdId = response.user?.id;
       // Only a sign-up that worked leaves a new session to undo; a refused
       // one leaves the admin's own session untouched.
       await _restoreSession(adminSession);
@@ -1370,6 +1372,22 @@ class CrmStore extends ChangeNotifier {
     }
     await load();
     notifyListeners();
+    // The server decides the role from the sign-up. A database whose
+    // registration trigger predates that writes 'student' whatever was asked
+    // for, and the new teacher turns up among the pupils with nothing to
+    // explain it.
+    final created = createdId == null
+        ? null
+        : users.where((u) => u.id == createdId).firstOrNull;
+    if (created != null && created.role != role) {
+      throw StateError(
+        'Akkaunt ochildi, lekin server uni '
+        '${created.role == AppRole.teacher ? 'ustoz' : 'o‘quvchi'} sifatida '
+        'yaratdi. Bazadagi ro‘yxatdan o‘tish triggeri tanlangan rolni '
+        'hisobga olmayapti: 20260918100000_registration_role.sql ni ishga '
+        'tushiring.',
+      );
+    }
   }
 
   /// Asks the server to create the account, so no session for it is ever made
