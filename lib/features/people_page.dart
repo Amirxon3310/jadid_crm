@@ -48,13 +48,15 @@ class PeoplePage extends StatelessWidget {
         children: [
           _responsiveHeader(
             title: 'Ustozlar ro‘yxati',
-            button: store.isOnline
-                ? null
-                : FilledButton.icon(
-                    onPressed: () => _addTeacher(context),
+            button: store.activeRole == AppRole.admin
+                ? FilledButton.icon(
+                    onPressed: () => store.isOnline
+                        ? _addAccount(context, store, role: AppRole.teacher)
+                        : _addTeacher(context),
                     icon: const Icon(Icons.add),
                     label: const Text('Ustoz qo‘shish'),
-                  ),
+                  )
+                : null,
           ),
           const SizedBox(height: 16),
           for (final teacher in store.teachers)
@@ -149,7 +151,7 @@ class PeoplePage extends StatelessWidget {
             button: store.activeRole == AppRole.admin
                 ? FilledButton.icon(
                     onPressed: () => store.isOnline
-                        ? _addStudentAccount(context, store)
+                        ? _addAccount(context, store, role: AppRole.student)
                         : _addStudent(context),
                     icon: const Icon(Icons.add),
                     label: const Text('O‘quvchi qo‘shish'),
@@ -363,9 +365,14 @@ Widget _responsiveHeader({required String title, Widget? button}) {
 
 String _fourDigits() => '${1000 + Random().nextInt(9000)}';
 
-/// Creates a pupil's account: the login and password start as four-digit
-/// suggestions the admin can accept or type over.
-Future<void> _addStudentAccount(BuildContext context, CrmStore store) async {
+/// Opens a pupil's or a teacher's account: the login and password start as
+/// four-digit suggestions the admin can accept or type over.
+Future<void> _addAccount(
+  BuildContext context,
+  CrmStore store, {
+  required AppRole role,
+}) async {
+  final teacher = role == AppRole.teacher;
   final name = TextEditingController();
   final login = TextEditingController(text: _fourDigits());
   final password = TextEditingController(text: _fourDigits());
@@ -380,7 +387,7 @@ Future<void> _addStudentAccount(BuildContext context, CrmStore store) async {
         },
         builder: (dialogContext) => StatefulBuilder(
           builder: (context, update) => AlertDialog(
-            title: const Text('Yangi o‘quvchi'),
+            title: Text(teacher ? 'Yangi ustoz' : 'Yangi o‘quvchi'),
             content: SizedBox(
               width: 440,
               child: Form(
@@ -430,10 +437,15 @@ Future<void> _addStudentAccount(BuildContext context, CrmStore store) async {
                           : null,
                     ),
                     const SizedBox(height: 10),
-                    const Text(
-                      'Login va parol taklif qilindi — xohlasangiz o‘zingiznikini '
-                      'yozing. O‘quvchi shu login va parol bilan kiradi.',
-                      style: TextStyle(fontSize: 12, color: AppColors.muted),
+                    Text(
+                      'Login va parol taklif qilindi — xohlasangiz '
+                      'o‘zingiznikini yozing. '
+                      '${teacher ? 'Ustoz' : 'O‘quvchi'} shu login va parol '
+                      'bilan kiradi.',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.muted,
+                      ),
                     ),
                   ],
                 ),
@@ -465,27 +477,30 @@ Future<void> _addStudentAccount(BuildContext context, CrmStore store) async {
       );
   // Saved from the page's own context, which outlives the dialog.
   if (entered == null || !context.mounted) return;
-  await _saveStudentAccount(
+  await _saveAccount(
     context,
     store,
+    role: role,
     name: entered.name,
     login: entered.login,
     password: entered.password,
   );
 }
 
-Future<void> _saveStudentAccount(
+Future<void> _saveAccount(
   BuildContext context,
   CrmStore store, {
+  required AppRole role,
   required String name,
   required String login,
   required String password,
 }) async {
   try {
-    await store.createStudentAccount(
+    await store.createAccount(
       name: name,
       login: login,
       password: password,
+      role: role,
     );
     if (!context.mounted) return;
     await showDialog<void>(
@@ -497,8 +512,9 @@ Future<void> _saveStudentAccount(
           width: 380,
           child: Text(
             '$name uchun:\n\nLogin: $login\nParol: $password\n\n'
-            'Shu ma’lumotlarni o‘quvchiga bering. Qolgan ma’lumotlarini '
-            'profilidan to‘ldirasiz.',
+            'Shu ma’lumotlarni '
+            '${role == AppRole.teacher ? 'ustozga' : 'o‘quvchiga'} bering. '
+            'Qolgan ma’lumotlarini profilidan to‘ldirasiz.',
           ),
         ),
         actions: [

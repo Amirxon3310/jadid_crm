@@ -13,7 +13,10 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(theme: buildTheme(), home: const AuthPage()),
+      MaterialApp(
+        theme: buildTheme(),
+        home: const AuthPage(allowRegistration: true),
+      ),
     );
     for (final registration in [false, true]) {
       if (registration) {
@@ -64,7 +67,10 @@ void main() {
     await tester.pumpWidget(
       RepaintBoundary(
         key: key,
-        child: MaterialApp(theme: buildTheme(), home: const AuthPage()),
+        child: MaterialApp(
+          theme: buildTheme(),
+          home: const AuthPage(allowRegistration: true),
+        ),
       ),
     );
     await tester.tap(find.text('Akkaunt yo‘q — ro‘yxatdan o‘tish'));

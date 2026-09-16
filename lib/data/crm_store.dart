@@ -1158,17 +1158,22 @@ class CrmStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Creates a pupil's account and reloads so they appear in the lists.
-  /// The sign-up runs on its own client: the admin stays signed in as
-  /// themselves, and the server decides the role, not this call.
-  Future<void> createStudentAccount({
+  /// Creates a pupil's or a teacher's account and reloads so they appear in
+  /// the lists. The sign-up runs on its own client: the admin stays signed in
+  /// as themselves, and the server decides the role from the sign-up itself,
+  /// not from this call.
+  Future<void> createAccount({
     required String name,
     required String login,
     required String password,
+    AppRole role = AppRole.student,
   }) async {
     if (activeRole != AppRole.admin) throw StateError('Admin huquqi kerak.');
     if (!isOnline)
       throw UnsupportedError('Akkaunt yaratish faqat serverda ishlaydi.');
+    // The server only ever signs someone up as a pupil or a teacher.
+    if (role == AppRole.admin)
+      throw ArgumentError('Admin akkauntini bu yerdan ochib bo‘lmaydi.');
     if (name.trim().isEmpty) throw ArgumentError('Ism va familiyani kiriting.');
     final problem = AuthService.validateLogin(login);
     if (problem != null) throw ArgumentError(problem);
@@ -1177,7 +1182,13 @@ class CrmStore extends ChangeNotifier {
                 () => SupabaseClient(
                   AppConfig.supabaseUrl,
                   AppConfig.supabasePublishableKey,
-                  authOptions: const AuthClientOptions(autoRefreshToken: false),
+                  // Implicit flow: a throwaway client has no storage to
+                  // keep a PKCE verifier in, and none is needed to sign a
+                  // pupil up with a login and password.
+                  authOptions: const AuthClientOptions(
+                    authFlowType: AuthFlowType.implicit,
+                    autoRefreshToken: false,
+                  ),
                 ))
             .call();
     try {
@@ -1185,7 +1196,7 @@ class CrmStore extends ChangeNotifier {
         login: login,
         password: password,
         name: name.trim(),
-        role: 'student',
+        role: role.name,
       );
     } finally {
       await signUp.dispose();
@@ -1193,6 +1204,13 @@ class CrmStore extends ChangeNotifier {
     await load();
     notifyListeners();
   }
+
+  /// A pupil's account, for callers that open no other kind.
+  Future<void> createStudentAccount({
+    required String name,
+    required String login,
+    required String password,
+  }) => createAccount(name: name, login: login, password: password);
 
   /// Removes a pupil or a teacher from the centre. The server decides who is
   /// allowed and hands the removed teacher's signatures to the acting admin,

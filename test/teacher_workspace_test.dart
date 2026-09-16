@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -574,5 +575,42 @@ void main() {
     expect(store.attendancePointsOf(pupil.id), 10);
     // The columns must still add up to what the pupil had before.
     expect(store.lessonPointsOf(pupil.id), 14);
+  });
+
+  test('an admin opens a teacher account, and never an admin one', () async {
+    final backend = FakeCrmBackend();
+    await backend.signIn();
+    final signUpBackend = FakeCrmBackend();
+    final store = CrmStore.online(
+      backend.client,
+      enableLiveUpdates: false,
+      newAccountClient: () => signUpBackend.client,
+    );
+    addTearDown(store.dispose);
+    await store.load();
+    store.activeRole = AppRole.admin;
+
+    await store.createAccount(
+      name: 'Yangi Ustoz',
+      login: 'ustoz01',
+      password: 'parol123',
+      role: AppRole.teacher,
+    );
+    // The role travels with the sign-up: the server reads it from there.
+    final signUp = jsonDecode(signUpBackend.authCalls.last.body) as Map;
+    expect(signUp['data']['registration_role'], 'teacher');
+    expect(signUp['data']['full_name'], 'Yangi Ustoz');
+    // The admin's own session was never touched.
+    expect(backend.client.auth.currentUser?.id, 'admin');
+
+    await expectLater(
+      store.createAccount(
+        name: 'Boshqa Admin',
+        login: 'admin02',
+        password: 'parol123',
+        role: AppRole.admin,
+      ),
+      throwsArgumentError,
+    );
   });
 }

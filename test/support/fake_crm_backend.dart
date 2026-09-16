@@ -14,6 +14,9 @@ class FakeCrmBackend {
   /// What Auth answers instead of a session, verbatim as Supabase words it.
   String? authError;
 
+  /// Sign-in and sign-up requests, kept apart from the data calls.
+  final authCalls = <http.Request>[];
+
   /// Columns, per table, a database predating their migration would not
   /// have yet. Selecting one by name fails the way PostgREST does.
   final missingColumns = <String, Set<String>>{};
@@ -123,6 +126,7 @@ class FakeCrmBackend {
     );
     final path = request.url.path;
     if (path.contains('/auth/')) {
+      authCalls.add(request);
       if (path.endsWith('/logout')) return http.Response('', 204);
       if (authError != null)
         return json({'message': authError, 'code': 422}, status: 422);

@@ -95,7 +95,11 @@ void main() {
   testWidgets('registration lets user choose teacher without email input', (
     tester,
   ) async {
-    await tester.pumpWidget(MaterialApp(home: AuthPage(authService: service)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuthPage(allowRegistration: true, authService: service),
+      ),
+    );
     await tester.tap(find.text('Akkaunt yo‘q — ro‘yxatdan o‘tish'));
     await tester.pumpAndSettle();
     expect(find.text('Email'), findsNothing);

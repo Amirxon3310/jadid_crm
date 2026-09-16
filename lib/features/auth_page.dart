@@ -9,9 +9,18 @@ import 'registration_role_picker.dart';
 import '../data/auth_service.dart';
 
 class AuthPage extends StatefulWidget {
-  const AuthPage({super.key, this.authService});
+  const AuthPage({
+    super.key,
+    this.authService,
+    this.allowRegistration = AppConfig.allowSelfRegistration,
+  });
 
   final AuthService? authService;
+
+  /// Whether the way into the sign-up form is offered. Off in the app while
+  /// the centre opens every account itself; a test turns it on to exercise
+  /// the form that stays behind it.
+  final bool allowRegistration;
 
   @override
   State<AuthPage> createState() => _AuthPageState();
@@ -204,20 +213,25 @@ class _AuthPageState extends State<AuthPage> {
                           )
                         : Text(register ? 'Ro‘yxatdan o‘tish' : 'Kirish'),
                   ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: loading
-                        ? null
-                        : () => setState(() {
-                            register = !register;
-                            passwordVisible = false;
-                          }),
-                    child: Text(
-                      register
-                          ? 'Akkauntim bor — kirish'
-                          : 'Akkaunt yo‘q — ro‘yxatdan o‘tish',
+                  // The way into the sign-up form. Hidden while the centre
+                  // opens every account itself; the form below it still
+                  // works the moment this is turned back on.
+                  if (widget.allowRegistration) ...[
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: loading
+                          ? null
+                          : () => setState(() {
+                              register = !register;
+                              passwordVisible = false;
+                            }),
+                      child: Text(
+                        register
+                            ? 'Akkauntim bor — kirish'
+                            : 'Akkaunt yo‘q — ro‘yxatdan o‘tish',
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
