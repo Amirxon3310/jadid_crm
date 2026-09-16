@@ -63,16 +63,25 @@ void main() {
       await store.load();
       store.activeRole = AppRole.admin;
 
+      final adminAuthCalls = backend.authCalls.length;
       await store.createAccount(
         name: 'Yangi O‘quvchi',
         login: 'pupil01',
         password: '482100',
       );
 
-      // The sign-up happened on the throwaway client, and the admin's own
-      // session is still theirs.
+      // The sign-up happened on the throwaway client.
       expect(signUpBackend.authCalls, isNotEmpty);
-      expect(backend.client.auth.currentUser?.id, 'admin');
+      // And the admin's own client re-asserted its session afterwards. On the
+      // web the new sign-in is announced to every client in the browser, so
+      // without this the admin is left inside the new account. Checking the
+      // signed-in id instead would prove nothing: the fake answers every auth
+      // call with its own user whatever happens.
+      expect(
+        backend.authCalls.length,
+        greaterThan(adminAuthCalls),
+        reason: 'the admin session was never put back',
+      );
       expect(store.activeUser.id, 'admin');
     },
   );
@@ -86,9 +95,8 @@ void main() {
 
     expect(await store.memberLogin('student'), 'ali_karimov');
 
-    // The page that shows it must survive the lookup failing.
-    backend.failWrites = true;
-    backend.memberLogin = null;
+    // The page that shows it must survive the lookup failing outright.
+    backend.rpcErrors['member_login'] = 403;
     expect(await store.memberLogin('student'), isNull);
   });
 
