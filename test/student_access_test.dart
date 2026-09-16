@@ -104,6 +104,11 @@ void main() {
     final planned = group.copyWith(startsOn: DateTime(2026, 9, 1));
     // 24 lessons, three a week: eight weeks from the first day.
     expect(planned.endsOn, DateTime(2026, 10, 26));
+
+    // 25 lessons is eight weeks and one lesson over, and that lesson needs a
+    // ninth week — a part week still counts.
+    final ragged = planned.copyWith(totalLessons: 25);
+    expect(ragged.endsOn!.difference(DateTime(2026, 9, 1)).inDays, 9 * 7 - 1);
     expect(
       group.copyWith(weekDays: const [2, 4, 6]).scheduleKindLabel,
       'Juft kunlari',
