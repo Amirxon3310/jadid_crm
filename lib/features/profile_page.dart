@@ -1,6 +1,6 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/app_notice.dart';
 import '../core/app_icon.dart';
@@ -35,6 +35,9 @@ class _ProfilePageState extends State<ProfilePage> {
       phone = TextEditingController(),
       email = TextEditingController();
   String? gender;
+
+  /// The login this account signs in with, fetched for an admin only.
+  String? login;
   late AppRole role;
   late String outcome;
   bool picking = false, removeAvatar = false;
@@ -47,6 +50,15 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _reset();
+    if (widget.store.activeRole == AppRole.admin) {
+      widget.store.memberLogin(widget.userId).then(
+        (value) {
+          if (mounted) setState(() => login = value);
+        },
+        // Nothing here is worth breaking the profile for.
+        onError: (Object _) {},
+      );
+    }
   }
 
   void _reset() {
@@ -526,6 +538,47 @@ class _ProfilePageState extends State<ProfilePage> {
                     );
                   },
                 ),
+                if (admin && login != null) ...[
+                  const SizedBox(height: 26),
+                  const Text(
+                    'Kirish ma’lumotlari',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 90,
+                        child: Text(
+                          'Login',
+                          style: TextStyle(color: AppColors.muted),
+                        ),
+                      ),
+                      SelectableText(
+                        login!,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      IconButton(
+                        tooltip: 'Nusxalash',
+                        onPressed: () async {
+                          await Clipboard.setData(ClipboardData(text: login!));
+                          if (context.mounted) {
+                            showAppNotice(context, 'Login nusxalandi');
+                          }
+                        },
+                        icon: const Icon(Icons.copy_rounded, size: 18),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Parolni ko‘rsatib bo‘lmaydi: u faqat shifrlangan holda '
+                    'saqlanadi, hech kim — admin ham — o‘qiy olmaydi. Parolni '
+                    'almashtirish uchun Supabase panelidagi Authentication '
+                    'bo‘limidan foydalaniladi.',
+                    style: TextStyle(fontSize: 12, color: AppColors.muted),
+                  ),
+                ],
                 if (user.role == AppRole.student) ...[
                   const SizedBox(height: 26),
                   const Text(

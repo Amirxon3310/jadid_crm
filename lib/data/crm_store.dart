@@ -527,6 +527,9 @@ class CrmStore extends ChangeNotifier {
     }
     await _loadStudentPortal();
     await _loadTeacherWorkspace();
+    // After the workspace, which clears the point totals before filling in
+    // its own: a classmate's total would otherwise be wiped on the way past.
+    await _loadClassmates();
     avatarUrls.clear();
     final paths = users
         .where((u) => u.avatarPath != null)
@@ -891,6 +894,82 @@ class CrmStore extends ChangeNotifier {
     }
   }
 
+  /// A pupil sees no one else's enrolment, so the group list and the rating
+  /// board would show them alone. The server hands over exactly what those
+  /// two need — who is in the group, their avatar, their state and their
+  /// points — and nothing else about them.
+  Future<void> _loadClassmates() async {
+    if (activeRole != AppRole.student) return;
+    for (final group in visibleGroups) {
+      final List<dynamic> rows;
+      try {
+        rows = await client!.rpc(
+          'group_classmates',
+          params: {'p_group_id': _serverId(group.id)},
+        );
+      } on PostgrestException catch (error) {
+        // PGRST202: the function is not there yet. The pupil then sees only
+        // themselves, as before.
+        if (error.code == 'PGRST202') return;
+        rethrow;
+      }
+      for (final row in rows.cast<Map<String, dynamic>>()) {
+        final id = row['profile_id'].toString();
+        final name = (row['full_name'] ?? 'O‘quvchi').toString();
+        final status = (row['study_status'] ?? 'active').toString();
+        if (!users.any((u) => u.id == id)) {
+          users.add(
+            AppUser(
+              id: id,
+              membershipId: row['membership_id'].toString(),
+              organizationId: group.organizationId,
+              name: name,
+              role: AppRole.student,
+              avatarPath: row['avatar_path'] as String?,
+            ),
+          );
+        }
+        if (!students.any((s) => s.id == id && s.groupId == group.id)) {
+          students.add(
+            Student(
+              id: id,
+              name: name,
+              groupId: group.id,
+              phone: '',
+              membershipId: row['membership_id'].toString(),
+              enrollmentId: row['enrollment_id'].toString(),
+              completed: status == 'completed',
+              left: status == 'left',
+              frozen: status == 'frozen',
+            ),
+          );
+        }
+        // Their total comes from the server; none of the attendance or
+        // homework behind it is readable here, so the baseline matches.
+        _pointTotals[id] = (row['points'] as num?)?.toInt() ?? 0;
+        _pointBaseline[id] = localPointsOf(id);
+      }
+    }
+  }
+
+  /// The login an account signs in with. Only an admin may ask, and the
+  /// server decides that. A password cannot be read at all — only its hash
+  /// is stored — so there is nothing of the sort here.
+  Future<String?> memberLogin(String userId) async {
+    if (!isOnline) return null;
+    try {
+      final value = await client!.rpc(
+        'member_login',
+        params: {'p_profile_id': userId},
+      );
+      return value as String?;
+    } catch (_) {
+      // Showing the login is a convenience — not deployed, not permitted or
+      // simply unreachable must never break the profile it sits on.
+      return null;
+    }
+  }
+
   Future<String> homeworkFileUrl(String path) async =>
       client!.storage.from('homework-files').createSignedUrl(path, 300);
 
@@ -1231,6 +1310,23 @@ class CrmStore extends ChangeNotifier {
     if (name.trim().isEmpty) throw ArgumentError('Ism va familiyani kiriting.');
     final problem = AuthService.validateLogin(login);
     if (problem != null) throw ArgumentError(problem);
+    // Creating an account signs that account in on the client that does it.
+    // On the web gotrue announces every sign-in to the other clients in the
+    // browser, so the admin's own session is replaced by the new pupil's.
+    // The server-side function avoids that entirely; when it is not deployed
+    // the admin's session is put back by hand below.
+    if (AppConfig.useServerAccountCreation &&
+        await _createAccountOnServer(
+          name: name.trim(),
+          login: login,
+          password: password,
+          role: role,
+        )) {
+      await load();
+      notifyListeners();
+      return;
+    }
+    final adminSession = client!.auth.currentSession;
     final signUp =
         (newAccountClient ??
                 () => SupabaseClient(
@@ -1252,11 +1348,77 @@ class CrmStore extends ChangeNotifier {
         name: name.trim(),
         role: role.name,
       );
+      // Only a sign-up that worked leaves a new session to undo; a refused
+      // one leaves the admin's own session untouched.
+      await _restoreSession(adminSession);
     } finally {
-      await signUp.dispose();
+      // Fire and forget: tearing the throwaway client down involves realtime
+      // and isolate shutdown, and the admin should not wait on it — nor
+      // should an error from the sign-up be held back behind it.
+      unawaited(signUp.dispose());
     }
     await load();
     notifyListeners();
+  }
+
+  /// Asks the server to create the account, so no session for it is ever made
+  /// in this browser. False when the function is not deployed, leaving the
+  /// caller to fall back.
+  Future<bool> _createAccountOnServer({
+    required String name,
+    required String login,
+    required String password,
+    required AppRole role,
+  }) async {
+    try {
+      await client!.functions.invoke(
+        'create-account',
+        body: {
+          'name': name,
+          'login': login,
+          'password': password,
+          'role': role.name,
+        },
+      );
+      return true;
+    } on FunctionException catch (error) {
+      // Not deployed: fall back to signing up on a throwaway client.
+      if (error.status == 404) return false;
+      // Anything else is the function's own verdict, and the admin should
+      // read it rather than have the app try again a different way.
+      final details = error.details;
+      final message = details is Map && details['error'] != null
+          ? details['error'].toString()
+          : 'Akkaunt yaratilmadi.';
+      throw ArgumentError(message);
+    } catch (_) {
+      // The function could not be reached at all; fall back as well.
+      return false;
+    }
+  }
+
+  /// Puts the admin's own session back after a sign-up replaced it.
+  Future<void> _restoreSession(Session? saved) async {
+    final token = saved?.refreshToken;
+    if (saved == null || token == null) return;
+    Future<void> restore() async {
+      if (client!.auth.currentUser?.id == saved.user.id) return;
+      try {
+        await client!.auth.setSession(token);
+      } catch (_) {
+        // Nothing better to do here: the admin is asked to sign in again.
+      }
+    }
+
+    await restore();
+    // The browser-wide announcement can land after the first attempt, so
+    // check again shortly — without holding up the caller, whose own result
+    // (or error) should reach the admin straight away.
+    unawaited(
+      Future<void>.delayed(const Duration(milliseconds: 250)).then((_) {
+        if (!_disposed) restore();
+      }),
+    );
   }
 
   /// A pupil's account, for callers that open no other kind.

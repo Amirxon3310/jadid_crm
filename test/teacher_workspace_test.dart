@@ -417,10 +417,16 @@ void main() {
       'Yangi O‘quvchi',
     );
     await tester.tap(find.widgetWithText(FilledButton, 'Yaratish'));
-    // The sign-up is real network work, so it only progresses outside the
-    // fake async zone.
+    // Real network work, so it only progresses outside the fake async zone —
+    // and there are two round trips now: asking for the server-side function
+    // (absent here) and then signing up on the throwaway client. A pump
+    // between the windows lets each continuation run.
     await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      () => Future<void>.delayed(const Duration(milliseconds: 400)),
+    );
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 400)),
     );
     // Frame by frame, not pumpAndSettle: the notice dismisses itself, and
     // settling would run fake time straight past it.

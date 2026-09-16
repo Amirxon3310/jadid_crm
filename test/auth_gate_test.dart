@@ -26,12 +26,14 @@ void main() {
       final before = tester
           .widget<WorkspaceShell>(find.byType(WorkspaceShell))
           .store;
-      final requests = backend.calls.length;
       await tester.tap(find.byTooltip('Profil va sozlamalar'));
       await tester.pumpAndSettle();
       expect(find.text('Yangilash'), findsNothing);
       await tester.tap(find.text('Mening profilim'));
       await tester.pumpAndSettle();
+      // Counted once the profile is open: opening it reads the account's
+      // login, which is a one-off and not what this test is about.
+      final requests = backend.calls.length;
 
       // Reopening the same session must not reconstruct the store or fetch its tables.
       await tester.runAsync(() => backend.client.auth.refreshSession());

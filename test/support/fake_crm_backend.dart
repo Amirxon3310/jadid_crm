@@ -17,6 +17,16 @@ class FakeCrmBackend {
   /// Sign-in and sign-up requests, kept apart from the data calls.
   final authCalls = <http.Request>[];
 
+  /// What group_classmates answers with.
+  List<Map<String, dynamic>> classmates = const [];
+
+  /// What member_login answers with.
+  String? memberLogin = 'ali_karimov';
+
+  /// Edge function invocations, and the ones this project has deployed.
+  final functionCalls = <http.Request>[];
+  final deployedFunctions = <String>{};
+
   /// Columns, per table, a database predating their migration would not
   /// have yet. Selecting one by name fails the way PostgREST does.
   final missingColumns = <String, Set<String>>{};
@@ -125,6 +135,15 @@ class FakeCrmBackend {
       request: request,
     );
     final path = request.url.path;
+    // No edge function is deployed here, which is what most projects look
+    // like: the app must fall back rather than fail.
+    if (path.contains('/functions/v1/')) {
+      functionCalls.add(request);
+      if (!deployedFunctions.contains(path.split('/').last)) {
+        return json({'error': 'Function not found'}, status: 404);
+      }
+      return json({'ok': true});
+    }
     if (path.contains('/auth/')) {
       authCalls.add(request);
       if (path.endsWith('/logout')) return http.Response('', 204);
@@ -146,6 +165,8 @@ class FakeCrmBackend {
     }
     calls.add(request);
     if (path.endsWith('/rpc/group_rankings')) return json(<String, dynamic>{});
+    if (path.endsWith('/rpc/group_classmates')) return json(classmates);
+    if (path.endsWith('/rpc/member_login')) return json(memberLogin);
     if (path.endsWith('/rpc/student_rankings'))
       return json({
         'coins': 0,

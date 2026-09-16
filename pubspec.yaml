@@ -30,6 +30,7 @@ flutter:
     - supabase/migrations/20260917120000_homework_review_and_files.sql
     - supabase/migrations/20260916080000_frozen_enrollment.sql
     - supabase/migrations/20260916190000_group_plan_and_resubmit.sql
+    - supabase/migrations/20260917200000_classmates_and_login.sql
   fonts:
     - family: SF Pro Display
       fonts:
