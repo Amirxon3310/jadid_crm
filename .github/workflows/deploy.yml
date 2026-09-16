@@ -34,7 +34,11 @@ jobs:
       - run: flutter analyze
       - run: flutter test
       # The site lives under /jadid_crm/, so every asset path must start there.
-      - run: flutter build web --release --base-href=/jadid_crm/
+      # --no-web-resources-cdn: serve CanvasKit from the site itself instead
+      # of gstatic.com. Fetching the engine from a third party is one more
+      # thing that has to be reachable, and when it is not the page stays
+      # blank with nothing drawn at all.
+      - run: flutter build web --release --no-web-resources-cdn --base-href=/jadid_crm/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
