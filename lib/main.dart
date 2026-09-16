@@ -11,18 +11,80 @@ import 'features/auth_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Supabase.initialize(
-    url: AppConfig.supabaseUrl,
-    publishableKey: AppConfig.supabasePublishableKey,
-  );
-  await loadSavedThemeMode();
-  runApp(const CrmApp());
+  // Anything thrown before runApp leaves a blank page and no way to tell
+  // why — a browser with site data blocked is enough to do it. Start
+  // regardless, and put the reason on screen.
+  String? startupError;
+  try {
+    await Supabase.initialize(
+      url: AppConfig.supabaseUrl,
+      publishableKey: AppConfig.supabasePublishableKey,
+    );
+  } catch (error) {
+    startupError = '$error';
+  }
+  try {
+    await loadSavedThemeMode();
+  } catch (_) {
+    // Only the remembered light/dark choice; not worth stopping for.
+  }
+  runApp(CrmApp(startupError: startupError));
 }
 
 class CrmApp extends StatelessWidget {
-  const CrmApp({super.key});
+  const CrmApp({super.key, this.startupError});
+
+  /// Set when the app could not connect to its database at start-up.
+  final String? startupError;
+
   @override
-  Widget build(BuildContext context) => const AuthGate();
+  Widget build(BuildContext context) => startupError == null
+      ? const AuthGate()
+      : _StartupFailure(message: startupError!);
+}
+
+/// Shown instead of a blank page when the app could not start.
+class _StartupFailure extends StatelessWidget {
+  const _StartupFailure({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    title: AppConfig.appTitle,
+    debugShowCheckedModeBanner: false,
+    theme: buildTheme(),
+    home: Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_rounded, size: 48),
+              const SizedBox(height: 12),
+              const Text(
+                'Dastur ishga tushmadi.',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Brauzer sayt ma’lumotlarini bloklagan bo‘lishi yoki '
+                'internetga ulanib bo‘lmagan bo‘lishi mumkin. Sahifani '
+                'yangilab ko‘ring.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              SelectableText(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, color: AppColors.muted),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 /// Wraps whatever the gate is showing in the app itself. Once a store is
