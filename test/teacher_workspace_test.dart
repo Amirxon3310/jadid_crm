@@ -170,7 +170,7 @@ void main() {
   test(
     'admin reassigns and freezes optimistically; failed edit rolls back',
     () async {
-      final backend = FakeCrmBackend();
+      final backend = FakeCrmBackend()..missingFunctions.add('create_account');
       await backend.signIn();
       final store = CrmStore.online(backend.client, enableLiveUpdates: false);
       addTearDown(store.dispose);
@@ -197,7 +197,7 @@ void main() {
   );
 
   test('background reads cannot overwrite a newer local edit', () async {
-    final backend = FakeCrmBackend();
+    final backend = FakeCrmBackend()..missingFunctions.add('create_account');
     await backend.signIn();
     final store = CrmStore.online(backend.client, enableLiveUpdates: false);
     addTearDown(store.dispose);
@@ -335,7 +335,7 @@ void main() {
   test(
     'a new pupil signs up on its own client, leaving the admin session',
     () async {
-      final backend = FakeCrmBackend();
+      final backend = FakeCrmBackend()..missingFunctions.add('create_account');
       await backend.signIn();
       final signUpBackend = FakeCrmBackend()..authId = 'new-account';
       final store = CrmStore.online(
@@ -384,7 +384,7 @@ void main() {
   testWidgets('a rejected sign-up is explained in Uzbek, with the way out', (
     tester,
   ) async {
-    final backend = FakeCrmBackend();
+    final backend = FakeCrmBackend()..missingFunctions.add('create_account');
     await backend.signIn();
     final signUpBackend = FakeCrmBackend()
       ..authId = 'new-account'
@@ -442,7 +442,7 @@ void main() {
   });
 
   test('an admin removes a member; anyone else is refused', () async {
-    final backend = FakeCrmBackend();
+    final backend = FakeCrmBackend()..missingFunctions.add('create_account');
     await backend.signIn();
     final store = CrmStore.online(backend.client, enableLiveUpdates: false);
     addTearDown(store.dispose);
@@ -585,7 +585,7 @@ void main() {
   });
 
   test('an admin opens a teacher account, and never an admin one', () async {
-    final backend = FakeCrmBackend();
+    final backend = FakeCrmBackend()..missingFunctions.add('create_account');
     await backend.signIn();
     final signUpBackend = FakeCrmBackend()..authId = 'new-account';
     final store = CrmStore.online(
@@ -622,7 +622,7 @@ void main() {
   });
 
   test('a server that ignores the chosen role says so', () async {
-    final backend = FakeCrmBackend();
+    final backend = FakeCrmBackend()..missingFunctions.add('create_account');
     await backend.signIn();
     // The sign-up answers with an id that already belongs to a pupil, which
     // is what an old registration trigger effectively does: it writes
@@ -652,6 +652,38 @@ void main() {
           contains('registration_role'),
         ),
       ),
+    );
+  });
+
+  test('an account is made in the database, with nothing signed in', () async {
+    final backend = FakeCrmBackend();
+    await backend.signIn();
+    final signUpBackend = FakeCrmBackend()..authId = 'new-account';
+    final store = CrmStore.online(
+      backend.client,
+      enableLiveUpdates: false,
+      newAccountClient: () => signUpBackend.client,
+    );
+    addTearDown(store.dispose);
+    await store.load();
+    store.activeRole = AppRole.admin;
+
+    await store.createAccount(
+      name: 'Yangi O\u2018quvchi',
+      login: 'pupil07',
+      password: '4821',
+      role: AppRole.student,
+    );
+
+    // The database made it, so the browser never signed anything in — which
+    // is what used to throw the admin into the new account.
+    expect(backend.createdAccounts, hasLength(1));
+    expect(backend.createdAccounts.single['p_login'], 'pupil07');
+    expect(backend.createdAccounts.single['p_role'], 'student');
+    expect(
+      signUpBackend.authCalls,
+      isEmpty,
+      reason: 'nothing was signed up in this browser',
     );
   });
 }

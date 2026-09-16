@@ -20,6 +20,9 @@ class FakeCrmBackend {
   /// Functions that answer with an error, by name and status.
   final rpcErrors = <String, int>{};
 
+  /// Accounts create_account was asked to make.
+  final createdAccounts = <Map<String, dynamic>>[];
+
   /// What group_classmates answers with.
   List<Map<String, dynamic>> classmates = const [];
 
@@ -186,6 +189,18 @@ class FakeCrmBackend {
       return json(classmates);
     }
     if (path.endsWith('/rpc/member_login')) return json(memberLogin);
+    if (path.endsWith('/rpc/create_account')) {
+      if (missingFunctions.contains('create_account')) {
+        return json({
+          'code': 'PGRST202',
+          'message': 'Could not find the function public.create_account',
+        }, status: 404);
+      }
+      createdAccounts.add(
+        Map<String, dynamic>.from(jsonDecode(request.body) as Map),
+      );
+      return json('00000000-0000-0000-0000-0000000000aa');
+    }
     if (path.endsWith('/rpc/student_rankings'))
       return json({
         'coins': 0,

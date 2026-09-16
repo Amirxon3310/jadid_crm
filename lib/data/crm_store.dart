@@ -1321,11 +1321,22 @@ class CrmStore extends ChangeNotifier {
     if (name.trim().isEmpty) throw ArgumentError('Ism va familiyani kiriting.');
     final problem = AuthService.validateLogin(login);
     if (problem != null) throw ArgumentError(problem);
-    // Creating an account signs that account in on the client that does it.
-    // On the web gotrue announces every sign-in to the other clients in the
-    // browser, so the admin's own session is replaced by the new pupil's.
-    // The server-side function avoids that entirely; when it is not deployed
-    // the admin's session is put back by hand below.
+    // Preferred: the database makes the account, so no session for it is
+    // ever created here and nothing is announced to the browser's other
+    // clients. Only when that function is absent does the app fall back to
+    // signing up, which does sign the new account in — and then the admin's
+    // own session has to be put back by hand.
+    final madeInDatabase = await _createAccountInDatabase(
+      name: name.trim(),
+      login: login,
+      password: password,
+      role: role,
+    );
+    if (madeInDatabase) {
+      await load();
+      notifyListeners();
+      return;
+    }
     if (AppConfig.useServerAccountCreation &&
         await _createAccountOnServer(
           name: name.trim(),
@@ -1390,9 +1401,36 @@ class CrmStore extends ChangeNotifier {
     }
   }
 
-  /// Asks the server to create the account, so no session for it is ever made
-  /// in this browser. False when the function is not deployed, leaving the
-  /// caller to fall back.
+  /// Creates the account in the database. False when that function is not
+  /// there yet, leaving the caller to fall back to signing up.
+  Future<bool> _createAccountInDatabase({
+    required String name,
+    required String login,
+    required String password,
+    required AppRole role,
+  }) async {
+    try {
+      await client!.rpc(
+        'create_account',
+        params: {
+          'p_login': AuthService.normalizeLogin(login),
+          'p_password': password,
+          'p_name': name,
+          'p_role': role.name,
+        },
+      );
+      return true;
+    } on PostgrestException catch (error) {
+      // PGRST202: not there yet — fall back.
+      if (error.code == 'PGRST202') return false;
+      // Anything else is the database's own verdict, and the admin should
+      // read it rather than have the app try a second way.
+      throw ArgumentError(error.message);
+    }
+  }
+
+  /// Asks the edge function to create the account. False when it is not
+  /// deployed, leaving the caller to fall back.
   Future<bool> _createAccountOnServer({
     required String name,
     required String login,

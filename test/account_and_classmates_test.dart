@@ -96,7 +96,7 @@ void main() {
   test(
     'creating an account leaves the admin signed in as themselves',
     () async {
-      final backend = FakeCrmBackend();
+      final backend = FakeCrmBackend()..missingFunctions.add('create_account');
       await backend.signIn();
       final signUpBackend = FakeCrmBackend()..authId = 'new-pupil';
       final store = CrmStore.online(
@@ -142,7 +142,9 @@ void main() {
     expect(await store.memberLogin('student'), isNull);
   });
 
-  testWidgets('a suggested login and password are six figures', (tester) async {
+  testWidgets('a suggested login and password are four figures', (
+    tester,
+  ) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1200, 1400);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -175,7 +177,7 @@ void main() {
         .toList();
     expect(fields, hasLength(2), reason: 'the login and the password');
     for (final value in fields) {
-      expect(value, matches(RegExp(r'^\d{6}$')), reason: value);
+      expect(value, matches(RegExp(r'^\d{4}$')), reason: value);
     }
   });
 }

@@ -363,11 +363,11 @@ Widget _responsiveHeader({required String title, Widget? button}) {
   );
 }
 
-String _sixDigits() => '${100000 + Random().nextInt(900000)}';
+String _fourDigits() => '${1000 + Random().nextInt(9000)}';
 
 /// Opens a pupil's or a teacher's account: the login and password start as
-/// six-figure suggestions the admin can accept or type over. Six, because
-/// Supabase refuses a password shorter than that.
+/// four-figure suggestions the admin can accept or type over. Four is short
+/// enough to read out and write down, which is how the centre hands them on.
 Future<void> _addAccount(
   BuildContext context,
   CrmStore store, {
@@ -375,8 +375,8 @@ Future<void> _addAccount(
 }) async {
   final teacher = role == AppRole.teacher;
   final name = TextEditingController();
-  final login = TextEditingController(text: _sixDigits());
-  final password = TextEditingController(text: _sixDigits());
+  final login = TextEditingController(text: _fourDigits());
+  final password = TextEditingController(text: _fourDigits());
   final form = GlobalKey<FormState>();
   final entered =
       await showFormDialog<({String name, String login, String password})>(
@@ -415,7 +415,7 @@ Future<void> _addAccount(
                         suffixIcon: IconButton(
                           tooltip: 'Boshqa raqam',
                           onPressed: () =>
-                              update(() => login.text = _sixDigits()),
+                              update(() => login.text = _fourDigits()),
                           icon: const Icon(Icons.casino_outlined, size: 20),
                         ),
                       ),
@@ -429,7 +429,7 @@ Future<void> _addAccount(
                         suffixIcon: IconButton(
                           tooltip: 'Boshqa raqam',
                           onPressed: () =>
-                              update(() => password.text = _sixDigits()),
+                              update(() => password.text = _fourDigits()),
                           icon: const Icon(Icons.casino_outlined, size: 20),
                         ),
                       ),
