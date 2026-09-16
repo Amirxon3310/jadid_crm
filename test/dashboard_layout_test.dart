@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jadid_crm/app_router.dart';
 import 'package:jadid_crm/core/app_theme.dart';
 import 'package:jadid_crm/data/crm_store.dart';
 import 'package:jadid_crm/data/models.dart';
-import 'package:jadid_crm/features/workspace.dart';
 
 void main() {
   testWidgets('dashboard adapts to desktop and phone with asset navigation', (
@@ -28,9 +28,9 @@ void main() {
     await tester.pumpWidget(
       RepaintBoundary(
         key: key,
-        child: MaterialApp(
+        child: MaterialApp.router(
           theme: buildTheme(),
-          home: Workspace(store: store),
+          routerConfig: buildRouter(store),
         ),
       ),
     );

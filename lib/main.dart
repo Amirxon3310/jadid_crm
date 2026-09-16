@@ -5,8 +5,9 @@ import 'core/app_theme.dart';
 import 'core/app_config.dart';
 import 'data/crm_store.dart';
 import 'data/auth_service.dart';
+import 'package:go_router/go_router.dart';
+import 'app_router.dart';
 import 'features/auth_page.dart';
-import 'features/workspace.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,18 +22,28 @@ Future<void> main() async {
 class CrmApp extends StatelessWidget {
   const CrmApp({super.key});
   @override
-  Widget build(BuildContext context) => ValueListenableBuilder<ThemeMode>(
-    valueListenable: appThemeMode,
-    builder: (context, mode, _) => MaterialApp(
-      title: AppConfig.appTitle,
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      darkTheme: buildTheme(brightness: Brightness.dark),
-      themeMode: mode,
-      home: const AuthGate(),
-    ),
-  );
+  Widget build(BuildContext context) => const AuthGate();
 }
+
+/// Wraps whatever the gate is showing in the app itself. Once a store is
+/// loaded the app is routed, so every screen has an address.
+Widget _app(ThemeMode mode, {Widget? home, GoRouter? router}) => router != null
+    ? MaterialApp.router(
+        title: AppConfig.appTitle,
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(),
+        darkTheme: buildTheme(brightness: Brightness.dark),
+        themeMode: mode,
+        routerConfig: router,
+      )
+    : MaterialApp(
+        title: AppConfig.appTitle,
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(),
+        darkTheme: buildTheme(brightness: Brightness.dark),
+        themeMode: mode,
+        home: home,
+      );
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key, this.client});
@@ -44,6 +55,7 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   CrmStore? store;
+  GoRouter? router;
   String? error;
   int syncVersion = 0;
   String? sessionUserId;
@@ -61,6 +73,7 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void dispose() {
     authSubscription?.cancel();
+    router?.dispose();
     store?.dispose();
     super.dispose();
   }
@@ -74,8 +87,10 @@ class _AuthGateState extends State<AuthGate> {
     final version = ++syncVersion;
     sessionUserId = userId;
     store?.dispose();
+    router?.dispose();
     setState(() {
       store = null;
+      router = null;
       error = null;
       loading = userId != null;
     });
@@ -89,6 +104,7 @@ class _AuthGateState extends State<AuthGate> {
       }
       setState(() {
         store = next;
+        router = buildRouter(next);
         loading = false;
       });
     } catch (exception) {
@@ -103,7 +119,16 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ValueListenableBuilder<ThemeMode>(
+    valueListenable: appThemeMode,
+    builder: (context, mode, _) => _app(
+      mode,
+      router: router,
+      home: router == null ? _gate(context) : null,
+    ),
+  );
+
+  Widget _gate(BuildContext context) {
     if (client.auth.currentSession == null)
       return AuthPage(authService: AuthService(client));
     if (error != null) {
@@ -130,8 +155,6 @@ class _AuthGateState extends State<AuthGate> {
         ),
       );
     }
-    if (store == null)
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    return Workspace(store: store!);
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

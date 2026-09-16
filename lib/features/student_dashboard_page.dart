@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/app_icon.dart';
 import '../data/crm_store.dart';
+import '../core/navigation.dart';
 import '../data/models.dart';
 import 'group_page.dart';
 
@@ -238,11 +239,10 @@ class StudentGroupCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () => Navigator.push(
+        onTap: () => goTo(
           context,
-          MaterialPageRoute<void>(
-            builder: (_) => GroupPage(store: store, group: group),
-          ),
+          groupPath(group.id),
+          fallback: (_) => GroupPage(store: store, group: group),
         ),
         child: Padding(
           padding: const EdgeInsets.all(18),

@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jadid_crm/app_router.dart';
 import 'package:jadid_crm/core/app_theme.dart';
 import 'package:jadid_crm/data/crm_store.dart';
 import 'package:jadid_crm/data/models.dart';
 import 'package:jadid_crm/features/profile_page.dart';
-import 'package:jadid_crm/features/workspace.dart';
 import 'support/fake_crm_backend.dart';
 
 void main() {
@@ -21,9 +21,9 @@ void main() {
       for (final width in [1000.0, 1536.0]) {
         tester.view.physicalSize = Size(width, 1092);
         await tester.pumpWidget(
-          MaterialApp(
+          MaterialApp.router(
             theme: buildTheme(),
-            home: Workspace(store: store),
+            routerConfig: buildRouter(store),
           ),
         );
         await tester.pumpAndSettle();
@@ -68,9 +68,9 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.view.resetPhysicalSize);
       await tester.pumpWidget(
-        MaterialApp(
+        MaterialApp.router(
           theme: buildTheme(),
-          home: Workspace(store: store),
+          routerConfig: buildRouter(store),
         ),
       );
       await tester.tap(find.byTooltip('Profil va sozlamalar'));

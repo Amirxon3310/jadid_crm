@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jadid_crm/app_router.dart';
 import 'package:jadid_crm/core/app_theme.dart';
 import 'package:jadid_crm/data/crm_store.dart';
 import 'package:jadid_crm/data/models.dart';
-import 'package:jadid_crm/features/workspace.dart';
 import 'package:jadid_crm/features/group_page.dart';
 
 void main() {
@@ -30,9 +30,9 @@ void main() {
       await tester.pumpWidget(
         RepaintBoundary(
           key: key,
-          child: MaterialApp(
+          child: MaterialApp.router(
             theme: buildTheme(),
-            home: Workspace(store: store),
+            routerConfig: buildRouter(store),
           ),
         ),
       );
@@ -115,10 +115,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildTheme(),
-        home: Workspace(store: store),
-      ),
+      MaterialApp.router(theme: buildTheme(), routerConfig: buildRouter(store)),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Guruhlar'));

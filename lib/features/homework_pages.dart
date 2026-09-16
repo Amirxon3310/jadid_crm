@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/app_notice.dart';
 import '../core/app_theme.dart';
 import '../core/helpers.dart';
+import '../core/navigation.dart';
 import '../core/user_avatar.dart';
 import '../data/crm_store.dart';
 import '../data/models.dart';
@@ -100,12 +101,11 @@ _Split _splitOf(CrmStore store, Homework homework) {
 }
 
 void _openDetail(BuildContext context, CrmStore store, Homework homework) =>
-    Navigator.push(
+    goTo(
       context,
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            HomeworkDetailPage(store: store, homeworkId: homework.id),
-      ),
+      homeworkPath(homework.id),
+      fallback: (_) =>
+          HomeworkDetailPage(store: store, homeworkId: homework.id),
     );
 
 // ---------------------------------------------------------------------------
@@ -1172,7 +1172,7 @@ class _Header extends StatelessWidget {
       children: [
         IconButton(
           tooltip: 'Orqaga',
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBack(context, '/homeworks'),
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
         ),
         const SizedBox(width: 4),

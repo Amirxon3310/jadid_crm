@@ -3,6 +3,7 @@ import '../core/app_theme.dart';
 import '../core/app_icon.dart';
 import '../core/helpers.dart';
 import '../data/crm_store.dart';
+import '../core/navigation.dart';
 import '../data/models.dart';
 import 'group_page.dart';
 import 'profile_page.dart';
@@ -527,13 +528,12 @@ class _DashboardPageState extends State<DashboardPage> {
                 '${store.groupById(lesson.groupId).name} • ${shortTime(lesson.startsAt)}',
               ),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
+              onTap: () => goTo(
                 context,
-                MaterialPageRoute<void>(
-                  builder: (_) => GroupPage(
-                    store: store,
-                    group: store.groupById(lesson.groupId),
-                  ),
+                groupPath(lesson.groupId),
+                fallback: (_) => GroupPage(
+                  store: store,
+                  group: store.groupById(lesson.groupId),
                 ),
               ),
             ),

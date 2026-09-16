@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jadid_crm/app_router.dart';
 import 'package:jadid_crm/core/app_theme.dart';
 import 'package:jadid_crm/data/crm_store.dart';
 import 'package:jadid_crm/data/models.dart';
 import 'package:jadid_crm/data/student_portal.dart';
-import 'package:jadid_crm/features/workspace.dart';
 import 'package:jadid_crm/features/profile_page.dart';
 import 'package:jadid_crm/features/payments_page.dart';
 
@@ -76,9 +76,9 @@ void main() {
     await tester.pumpWidget(
       RepaintBoundary(
         key: key,
-        child: MaterialApp(
+        child: MaterialApp.router(
           theme: buildTheme(),
-          home: Workspace(store: store),
+          routerConfig: buildRouter(store),
         ),
       ),
     );
@@ -146,10 +146,7 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildTheme(),
-        home: Workspace(store: store),
-      ),
+      MaterialApp.router(theme: buildTheme(), routerConfig: buildRouter(store)),
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

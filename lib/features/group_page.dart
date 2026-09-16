@@ -5,6 +5,7 @@ import '../core/migration.dart';
 import '../core/migration_setup.dart';
 import '../core/app_icon.dart';
 import '../core/helpers.dart';
+import '../core/navigation.dart';
 import '../core/user_avatar.dart';
 import '../data/crm_store.dart';
 import '../data/models.dart';
@@ -41,6 +42,7 @@ class _GroupPageState extends State<GroupPage> {
   @override
   void didUpdateWidget(covariant GroupPage oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.startTab != widget.startTab) tab = widget.startTab;
     if (oldWidget.store != widget.store) {
       oldWidget.store.removeListener(_refresh);
       widget.store.addListener(_refresh);
@@ -57,6 +59,16 @@ class _GroupPageState extends State<GroupPage> {
     if (mounted) setState(() {});
   }
 
+  /// Under the router the tab lives in the address; on its own the page
+  /// just switches, as a single screen in a test does.
+  void _openTab(String groupId, int index) {
+    if (isRouted(context)) {
+      goTo(context, groupPath(groupId, groupTabs[index]));
+    } else {
+      setState(() => tab = index);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final group = widget.store.visibleGroups
@@ -70,7 +82,7 @@ class _GroupPageState extends State<GroupPage> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: IconButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => goBack(context, '/groups'),
                   icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
                 ),
               ),
@@ -122,7 +134,7 @@ class _GroupPageState extends State<GroupPage> {
                         Row(
                           children: [
                             IconButton(
-                              onPressed: () => Navigator.pop(context),
+                              onPressed: () => goBack(context, '/groups'),
                               icon: const Icon(
                                 Icons.arrow_back_ios_new_rounded,
                                 size: 18,
@@ -153,10 +165,14 @@ class _GroupPageState extends State<GroupPage> {
                               IconButton(
                                 tooltip: 'Guruhni tahrirlash',
                                 icon: const AppIcon('edit', size: 22),
-                                onPressed: () => editStudyGroup(
+                                onPressed: () => goOr(
                                   context,
-                                  widget.store,
-                                  group: group,
+                                  '${groupPath(group.id)}/edit',
+                                  () => editStudyGroup(
+                                    context,
+                                    widget.store,
+                                    group: group,
+                                  ),
                                 ),
                               ),
                           ],
@@ -185,7 +201,7 @@ class _GroupPageState extends State<GroupPage> {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
-                                  onPressed: () => setState(() => tab = index),
+                                  onPressed: () => _openTab(group.id, index),
                                   child: Text(labels[index]),
                                 ),
                               );
@@ -305,11 +321,9 @@ class _InfoTab extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  student.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                PersonName(
+                                  userId: student.id,
+                                  name: student.name,
                                 ),
                                 Text(
                                   student.phone,

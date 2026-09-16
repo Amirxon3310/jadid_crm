@@ -1,33 +1,29 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../core/navigation.dart';
+import '../core/app_config.dart';
 import '../core/app_theme.dart';
 import '../core/app_icon.dart';
 import '../core/helpers.dart';
 import '../data/crm_store.dart';
 import '../data/models.dart';
-import 'dashboard_page.dart';
-import 'groups_page.dart';
-import 'homeworks_page.dart';
-import 'people_page.dart';
 import 'profile_page.dart';
-import 'student_dashboard_page.dart';
-import 'teacher_dashboard_page.dart';
-import 'payments_page.dart';
-import 'branches_page.dart';
 import '../core/user_avatar.dart';
 
-class Workspace extends StatefulWidget {
-  const Workspace({super.key, required this.store});
+/// The sidebar and top bar every routed page sits inside. Which item is
+/// lit, and the heading above the page, both come from the current address.
+class WorkspaceShell extends StatefulWidget {
+  const WorkspaceShell({super.key, required this.store, required this.child});
   final CrmStore store;
+  final Widget child;
   @override
-  State<Workspace> createState() => _WorkspaceState();
+  State<WorkspaceShell> createState() => _WorkspaceShellState();
 }
 
-class _WorkspaceState extends State<Workspace> {
-  int selectedPage = 0;
+class _WorkspaceShellState extends State<WorkspaceShell> {
   bool collapsed = false;
-  String? profileUserId;
-  void _showProfile(String id) => setState(() => profileUserId = id);
+  void _showProfile(String id) => goTo(context, profilePath(id));
   @override
   void initState() {
     super.initState();
@@ -36,7 +32,7 @@ class _WorkspaceState extends State<Workspace> {
   }
 
   @override
-  void didUpdateWidget(covariant Workspace oldWidget) {
+  void didUpdateWidget(covariant WorkspaceShell oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.store != widget.store) {
       oldWidget.store.removeListener(_refresh);
@@ -60,8 +56,21 @@ class _WorkspaceState extends State<Workspace> {
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= 1000;
     final menu = _menu();
-    if (selectedPage >= menu.length) selectedPage = 0;
-    final current = menu[selectedPage];
+    final location = GoRouterState.of(context).uri.path;
+    final onProfile = location.startsWith('/profile');
+    // The deepest matching path wins, so /groups/12 still lights "Guruhlar".
+    var selectedPage = -1;
+    for (var index = 0; index < menu.length; index++) {
+      final path = menu[index].path;
+      final matches = path == '/'
+          ? location == '/'
+          : location == path || location.startsWith('$path/');
+      if (matches &&
+          (selectedPage < 0 || path.length > menu[selectedPage].path.length)) {
+        selectedPage = index;
+      }
+    }
+    if (onProfile) selectedPage = -1;
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
@@ -111,26 +120,11 @@ class _WorkspaceState extends State<Workspace> {
                   context,
                   () => widget.store.client!.auth.signOut(),
                 );
-              if (value == 'homeworks')
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => Scaffold(
-                      appBar: AppBar(title: const Text('Uy vazifalari')),
-                      body: AnimatedBuilder(
-                        animation: widget.store,
-                        builder: (context, _) => SingleChildScrollView(
-                          padding: const EdgeInsets.all(24),
-                          child: HomeworksPage(store: widget.store),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
+              if (value == 'homeworks') goTo(context, '/homeworks');
               for (final role in AppRole.values) {
                 if (value == role.name && !widget.store.isOnline) {
-                  selectedPage = 0;
-                  profileUserId = null;
                   widget.store.changeRole(role);
+                  goTo(context, '/');
                 }
               }
             },
@@ -245,7 +239,7 @@ class _WorkspaceState extends State<Workspace> {
               child: SafeArea(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
-                  child: _navigation(menu, drawer: true),
+                  child: _navigation(menu, selectedPage, drawer: true),
                 ),
               ),
             ),
@@ -262,54 +256,57 @@ class _WorkspaceState extends State<Workspace> {
                     : width >= 1400
                     ? 350
                     : 280,
-                child: SingleChildScrollView(child: _navigation(menu)),
+                child: SingleChildScrollView(
+                  child: _navigation(menu, selectedPage),
+                ),
               ),
             ),
           Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                wide ? 38 : 20,
-                wide ? 38 : 24,
-                wide ? width * .085 : 20,
-                38,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    profileUserId == null ? current.title : 'Profil',
-                    style: const TextStyle(
-                      fontSize: 27,
-                      height: 1.1,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -.8,
-                    ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    wide ? 38 : 20,
+                    wide ? 38 : 24,
+                    wide ? width * .085 : 20,
+                    0,
                   ),
-                  const SizedBox(height: 7),
-                  Text(
-                    profileUserId != null
-                        ? 'Shaxsiy ma’lumotlar va akkaunt sozlamalari'
-                        : selectedPage == 0 &&
-                              widget.store.activeRole == AppRole.admin
-                        ? 'Platforma statistikasi va ko‘rsatkichlari'
-                        : _welcomeText(),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.muted,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        onProfile
+                            ? 'Profil'
+                            : selectedPage < 0
+                            ? AppConfig.appTitle
+                            : menu[selectedPage].title,
+                        style: const TextStyle(
+                          fontSize: 27,
+                          height: 1.1,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -.8,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        onProfile
+                            ? 'Shaxsiy ma’lumotlar va akkaunt sozlamalari'
+                            : selectedPage == 0 &&
+                                  widget.store.activeRole == AppRole.admin
+                            ? 'Platforma statistikasi va ko‘rsatkichlari'
+                            : _welcomeText(),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                  if (profileUserId != null)
-                    ProfilePage(
-                      key: ValueKey(profileUserId),
-                      store: widget.store,
-                      userId: profileUserId!,
-                      onCancel: () => setState(() => profileUserId = null),
-                    )
-                  else
-                    current.page,
-                ],
-              ),
+                ),
+                const SizedBox(height: 20),
+                Expanded(child: widget.child),
+              ],
             ),
           ),
         ],
@@ -317,7 +314,11 @@ class _WorkspaceState extends State<Workspace> {
     );
   }
 
-  Widget _navigation(List<_MenuItem> menu, {bool drawer = false}) {
+  Widget _navigation(
+    List<_MenuItem> menu,
+    int selectedPage, {
+    bool drawer = false,
+  }) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 210 && !drawer;
@@ -356,17 +357,14 @@ class _WorkspaceState extends State<Workspace> {
                   child: Tooltip(
                     message: compact ? menu[index].title : '',
                     child: Material(
-                      color: profileUserId == null && selectedPage == index
+                      color: selectedPage == index
                           ? AppColors.softBlue(context)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(20),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(20),
                         onTap: () {
-                          setState(() {
-                            selectedPage = index;
-                            profileUserId = null;
-                          });
+                          goTo(context, menu[index].path);
                           if (drawer) Navigator.pop(context);
                         },
                         child: SizedBox(
@@ -385,9 +383,7 @@ class _WorkspaceState extends State<Workspace> {
                                   children: [
                                     AppIcon(
                                       menu[index].asset,
-                                      active:
-                                          profileUserId == null &&
-                                          selectedPage == index,
+                                      active: selectedPage == index,
                                       fallback: menu[index].icon,
                                       size: 27,
                                     ),
@@ -406,9 +402,7 @@ class _WorkspaceState extends State<Workspace> {
                                       menu[index].title,
                                       style: TextStyle(
                                         fontSize: 14,
-                                        color:
-                                            profileUserId == null &&
-                                                selectedPage == index
+                                        color: selectedPage == index
                                             ? AppColors.primary
                                             : AppColors.muted,
                                       ),
@@ -453,11 +447,7 @@ class _WorkspaceState extends State<Workspace> {
             child: Center(
               child: switch (value) {
                 'logout' => const AppIcon('exit', active: false, size: 19),
-                'profile' => AppIcon(
-                  'user',
-                  active: profileUserId == widget.store.activeUser.id,
-                  size: 20,
-                ),
+                'profile' => const AppIcon('user', size: 20),
                 'users' => const AppIcon('groups', active: true, size: 20),
                 _ => Icon(icon, size: 20, color: color),
               },
@@ -478,65 +468,31 @@ class _WorkspaceState extends State<Workspace> {
   }
 
   List<_MenuItem> _menu() => [
-    _MenuItem(
-      'Dashboard',
-      'dashboards',
-      Icons.dashboard_outlined,
-      widget.store.activeRole == AppRole.student
-          ? StudentDashboardPage(store: widget.store)
-          : widget.store.activeRole == AppRole.teacher
-          ? TeacherDashboardPage(store: widget.store)
-          : DashboardPage(store: widget.store, onOpenProfile: _showProfile),
-    ),
+    _MenuItem('Dashboard', 'dashboards', Icons.dashboard_outlined, '/'),
     _MenuItem(
       widget.store.activeRole == AppRole.student ? 'Guruhlarim' : 'Guruhlar',
       'groups',
       Icons.layers_outlined,
-      widget.store.activeRole == AppRole.student
-          ? MyGroupsPage(store: widget.store)
-          : GroupsPage(store: widget.store),
+      '/groups',
     ),
     if (widget.store.activeRole == AppRole.admin)
-      _MenuItem(
-        'Ustozlar',
-        'teachers',
-        Icons.school_outlined,
-        PeoplePage(
-          store: widget.store,
-          showTeachers: true,
-          onOpenProfile: _showProfile,
-        ),
-      ),
+      _MenuItem('Ustozlar', 'teachers', Icons.school_outlined, '/teachers'),
     if (widget.store.activeRole != AppRole.student)
-      _MenuItem(
-        'O‘quvchilar',
-        'students',
-        Icons.person_outline,
-        PeoplePage(
-          store: widget.store,
-          showTeachers: false,
-          onOpenProfile: _showProfile,
-        ),
-      ),
+      _MenuItem('O‘quvchilar', 'students', Icons.person_outline, '/students'),
     if (widget.store.activeRole != AppRole.teacher)
       _MenuItem(
         'To‘lovlar',
         null,
         Icons.account_balance_wallet_outlined,
-        PaymentsPage(store: widget.store),
+        '/payments',
       ),
     if (widget.store.activeRole == AppRole.admin)
-      _MenuItem(
-        'Filiallar',
-        null,
-        Icons.location_on_outlined,
-        BranchesPage(store: widget.store),
-      ),
+      _MenuItem('Filiallar', null, Icons.location_on_outlined, '/branches'),
     _MenuItem(
       'Uy vazifalari',
       null,
       Icons.assignment_outlined,
-      HomeworksPage(store: widget.store),
+      '/homeworks',
       // A pupil sees what they still owe; staff see what is waiting to be
       // marked.
       badge: widget.store.homeworkBadgeCount(),
@@ -557,13 +513,15 @@ class _MenuItem {
     this.title,
     this.asset,
     this.icon,
-    this.page, {
+    this.path, {
     this.badge = 0,
   });
   final String title;
   final String? asset;
   final IconData icon;
-  final Widget page;
+
+  /// Where the item goes, and what lights it up when the app is there.
+  final String path;
 
   /// Count shown in a red badge on the menu row; 0 shows nothing.
   final int badge;
@@ -598,4 +556,13 @@ class _MenuBadge extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// The padding a page inside the shell gives itself. The shell only owns the
+/// heading now; each page scrolls on its own, because the routed child is a
+/// navigator and cannot sit inside a scroll view.
+EdgeInsets workspaceContentPadding(BuildContext context) {
+  final width = MediaQuery.sizeOf(context).width;
+  final wide = width >= 1000;
+  return EdgeInsets.fromLTRB(wide ? 38 : 20, 0, wide ? width * .085 : 20, 38);
 }

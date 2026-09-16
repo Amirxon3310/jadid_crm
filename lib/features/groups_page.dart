@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/app_icon.dart';
 import '../data/crm_store.dart';
+import '../core/navigation.dart';
 import '../data/models.dart';
 import 'group_page.dart';
 import 'group_editor.dart';
@@ -165,8 +166,8 @@ class _GroupsPageState extends State<GroupsPage> {
     );
   }
 
-  Future<void> _addGroup(BuildContext context) =>
-      editStudyGroup(context, widget.store);
+  void _addGroup(BuildContext context) =>
+      goOr(context, '/groups/new', () => editStudyGroup(context, widget.store));
 }
 
 class _GroupTile extends StatelessWidget {
@@ -223,8 +224,11 @@ class _GroupTile extends StatelessWidget {
                   if (store.activeRole == AppRole.admin)
                     IconButton(
                       tooltip: 'Guruhni tahrirlash',
-                      onPressed: () =>
-                          editStudyGroup(context, store, group: group),
+                      onPressed: () => goOr(
+                        context,
+                        '${groupPath(group.id)}/edit',
+                        () => editStudyGroup(context, store, group: group),
+                      ),
                       icon: const AppIcon('edit', size: 22),
                     ),
                   const Icon(Icons.chevron_right, color: AppColors.muted),
@@ -271,14 +275,11 @@ class _GroupTile extends StatelessWidget {
     );
   }
 
-  void _open(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute<void>(
-        builder: (_) => GroupPage(store: store, group: group),
-      ),
-    );
-  }
+  void _open(BuildContext context) => goTo(
+    context,
+    groupPath(group.id),
+    fallback: (_) => GroupPage(store: store, group: group),
+  );
 }
 
 /// Green once a group is keeping up, red when it has fallen behind, muted

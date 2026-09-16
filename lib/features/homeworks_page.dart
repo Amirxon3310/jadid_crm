@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/helpers.dart';
 import '../data/crm_store.dart';
+import '../core/navigation.dart';
 import '../data/models.dart';
 import 'homework_pages.dart';
 
@@ -96,12 +97,11 @@ class _HomeworkRow extends StatelessWidget {
         ),
       ),
       trailing: const Icon(Icons.chevron_right, color: AppColors.muted),
-      onTap: () => Navigator.push(
+      onTap: () => goTo(
         context,
-        MaterialPageRoute<void>(
-          builder: (_) =>
-              HomeworkDetailPage(store: store, homeworkId: homework.id),
-        ),
+        homeworkPath(homework.id),
+        fallback: (_) =>
+            HomeworkDetailPage(store: store, homeworkId: homework.id),
       ),
     );
   }

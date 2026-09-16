@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jadid_crm/app_router.dart';
 import 'package:jadid_crm/core/app_theme.dart';
 import 'package:jadid_crm/data/crm_store.dart';
 import 'package:jadid_crm/data/models.dart';
 import 'package:jadid_crm/features/groups_page.dart';
-import 'package:jadid_crm/features/workspace.dart';
 
 /// Order the group tiles appear in, read from their headings.
 List<String> _order(WidgetTester tester, List<String> names) {
@@ -136,10 +136,7 @@ void main() {
     expect(waiting, greaterThan(0));
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildTheme(),
-        home: Workspace(store: store),
-      ),
+      MaterialApp.router(theme: buildTheme(), routerConfig: buildRouter(store)),
     );
     await tester.pumpAndSettle();
 

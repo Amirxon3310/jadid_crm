@@ -1,17 +1,21 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jadid_crm/app_router.dart';
 import 'package:jadid_crm/core/helpers.dart';
 import 'package:jadid_crm/data/crm_store.dart';
 import 'package:jadid_crm/data/models.dart';
-import 'package:jadid_crm/features/workspace.dart';
 
 void main() {
   testWidgets('workspace listens to replacement store', (tester) async {
     final oldStore = _ObservableStore();
     final newStore = _ObservableStore();
-    await tester.pumpWidget(MaterialApp(home: Workspace(store: oldStore)));
-    await tester.pumpWidget(MaterialApp(home: Workspace(store: newStore)));
+    await tester.pumpWidget(
+      MaterialApp.router(routerConfig: buildRouter(oldStore)),
+    );
+    await tester.pumpWidget(
+      MaterialApp.router(routerConfig: buildRouter(newStore)),
+    );
     expect(oldStore.listening, isFalse);
     expect(newStore.listening, isTrue);
     newStore.changeRole(AppRole.student);

@@ -30,9 +30,9 @@ class PeoplePage extends StatelessWidget {
   void _open(BuildContext context, String id) {
     if (onOpenProfile != null) {
       onOpenProfile!(id);
-    } else {
-      openProfile(context, store, id);
+      return;
     }
+    openProfile(context, store, id);
   }
 
   @override

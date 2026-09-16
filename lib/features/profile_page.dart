@@ -6,6 +6,7 @@ import '../core/app_notice.dart';
 import '../core/app_icon.dart';
 import '../core/app_theme.dart';
 import '../core/helpers.dart';
+import '../core/navigation.dart';
 import '../core/user_avatar.dart';
 import '../data/crm_store.dart';
 import '../data/models.dart';
@@ -664,27 +665,35 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 }
 
-void openProfile(BuildContext context, CrmStore store, String userId) {
-  Navigator.push(
-    context,
-    MaterialPageRoute<void>(
-      builder: (_) => Scaffold(
-        appBar: AppBar(title: const Text('Profil')),
-        body: AnimatedBuilder(
-          animation: store,
-          builder: (context, _) => SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1100),
-                child: ProfilePage(store: store, userId: userId),
-              ),
+void openProfile(BuildContext context, CrmStore store, String userId) => goTo(
+  context,
+  profilePath(userId),
+  fallback: (_) => _ProfileScreen(store: store, userId: userId),
+);
+
+class _ProfileScreen extends StatelessWidget {
+  const _ProfileScreen({required this.store, required this.userId});
+  final CrmStore store;
+  final String userId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Profil')),
+      body: AnimatedBuilder(
+        animation: store,
+        builder: (context, _) => SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: ProfilePage(store: store, userId: userId),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 Future<void> showProfiles(

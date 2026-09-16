@@ -23,7 +23,9 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 20));
       });
       await tester.pumpAndSettle();
-      final before = tester.widget<Workspace>(find.byType(Workspace)).store;
+      final before = tester
+          .widget<WorkspaceShell>(find.byType(WorkspaceShell))
+          .store;
       final requests = backend.calls.length;
       await tester.tap(find.byTooltip('Profil va sozlamalar'));
       await tester.pumpAndSettle();
@@ -35,7 +37,7 @@ void main() {
       await tester.runAsync(() => backend.client.auth.refreshSession());
       await tester.pumpAndSettle();
       expect(
-        tester.widget<Workspace>(find.byType(Workspace)).store,
+        tester.widget<WorkspaceShell>(find.byType(WorkspaceShell)).store,
         same(before),
       );
       expect(backend.calls.length, requests);
@@ -43,14 +45,14 @@ void main() {
       await tester.runAsync(backend.signIn);
       await tester.pumpAndSettle();
       expect(
-        tester.widget<Workspace>(find.byType(Workspace)).store,
+        tester.widget<WorkspaceShell>(find.byType(WorkspaceShell)).store,
         same(before),
       );
       expect(backend.calls.length, requests);
       await tester.runAsync(() => backend.client.auth.signOut());
       await tester.pumpAndSettle();
       expect(find.byType(AuthPage), findsOneWidget);
-      expect(find.byType(Workspace), findsNothing);
+      expect(find.byType(WorkspaceShell), findsNothing);
       await tester.pumpWidget(const SizedBox());
       await tester.runAsync(backend.client.dispose);
     },
@@ -79,7 +81,7 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 20));
     });
     await tester.pumpAndSettle();
-    expect(find.byType(Workspace), findsOneWidget);
+    expect(find.byType(WorkspaceShell), findsOneWidget);
     expect(
       backend.calls.where((r) => r.url.path.endsWith('/profiles')).length,
       1,
