@@ -17,6 +17,9 @@ class FakeCrmBackend {
   /// Sign-in and sign-up requests, kept apart from the data calls.
   final authCalls = <http.Request>[];
 
+  /// Functions that answer with an error, by name and status.
+  final rpcErrors = <String, int>{};
+
   /// What group_classmates answers with.
   List<Map<String, dynamic>> classmates = const [];
 
@@ -164,6 +167,14 @@ class FakeCrmBackend {
       });
     }
     calls.add(request);
+    for (final entry in rpcErrors.entries) {
+      if (path.endsWith('/rpc/${entry.key}')) {
+        return json({
+          'message': 'Denied',
+          'code': '42501',
+        }, status: entry.value);
+      }
+    }
     if (path.endsWith('/rpc/group_rankings')) return json(<String, dynamic>{});
     if (path.endsWith('/rpc/group_classmates')) return json(classmates);
     if (path.endsWith('/rpc/member_login')) return json(memberLogin);
