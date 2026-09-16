@@ -488,6 +488,13 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
       ),
     if (widget.store.activeRole == AppRole.admin)
       _MenuItem('Filiallar', null, Icons.location_on_outlined, '/branches'),
+    if (widget.store.activeRole == AppRole.admin)
+      _MenuItem(
+        'Ustozlar davomati',
+        null,
+        Icons.photo_camera_outlined,
+        '/checkins',
+      ),
     _MenuItem(
       'Uy vazifalari',
       null,

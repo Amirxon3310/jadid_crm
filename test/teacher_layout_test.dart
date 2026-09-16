@@ -92,7 +92,7 @@ void main() {
           await tester.tap(find.text('Uy vazifa qo‘shish'));
           await tester.pumpAndSettle();
           await tester.enterText(
-            find.widgetWithText(TextField, 'Izoh (nima qilish kerak)'),
+            find.widgetWithText(TextField, 'Nima qilish kerak?'),
             'New linked task',
           );
           await tester.tap(find.widgetWithText(FilledButton, 'Qo‘shish'));
@@ -145,7 +145,7 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('journal ranks pupils and reports counts with a percentage', (
+  testWidgets('journal ranks pupils and reports shares, not counts', (
     tester,
   ) async {
     final store = CrmStore();
@@ -186,13 +186,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Whole history by default, counts shown as "done / total (share)".
+    // Whole history by default, each pupil's share as one figure.
     expect(find.text('Hammasi'), findsOneWidget);
+    expect(find.text('100%'), findsOneWidget);
+    expect(find.text('0%'), findsWidgets);
     expect(
       find.text('${lessons.length} / ${lessons.length} (100 %)'),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.text('0 / ${lessons.length} (0 %)'), findsWidgets);
 
     // Best attendance on top, worst at the bottom.
     double yOf(String name) => tester.getTopLeft(find.text(name)).dy;

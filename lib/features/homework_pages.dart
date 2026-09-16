@@ -199,26 +199,38 @@ class GroupHomeworkTab extends StatelessWidget {
       const DataColumn(label: Text('#')),
       const DataColumn(label: Text('Mavzu')),
       const DataColumn(
-        numeric: true,
         label: Tooltip(
           message: 'O‘quvchilar',
-          child: Icon(Icons.person_outline_rounded, color: AppColors.muted),
+          child: SizedBox(
+            width: 36,
+            child: Center(
+              child: Icon(Icons.person_outline_rounded, color: AppColors.muted),
+            ),
+          ),
         ),
       ),
       const DataColumn(
-        numeric: true,
         label: Tooltip(
           message: 'Tekshirilishi kutilmoqda',
-          child: Icon(Icons.timer_outlined, color: AppColors.warning),
+          child: SizedBox(
+            width: 36,
+            child: Center(
+              child: Icon(Icons.timer_outlined, color: AppColors.warning),
+            ),
+          ),
         ),
       ),
       const DataColumn(
-        numeric: true,
         label: Tooltip(
           message: 'Qabul qilingan',
-          child: Icon(
-            Icons.check_circle_outline_rounded,
-            color: AppColors.rewardGreen,
+          child: SizedBox(
+            width: 36,
+            child: Center(
+              child: Icon(
+                Icons.check_circle_outline_rounded,
+                color: AppColors.rewardGreen,
+              ),
+            ),
           ),
         ),
       ),
@@ -253,25 +265,19 @@ class GroupHomeworkTab extends StatelessWidget {
             highlight: split.waiting > 0,
           ),
         ),
-        DataCell(Text('${split.pupils}')),
+        DataCell(_Count('${split.pupils}')),
         DataCell(
-          Text(
+          _Count(
             '${split.waiting}',
-            style: TextStyle(
-              color: split.waiting > 0 ? AppColors.warning : AppColors.muted,
-              fontWeight: split.waiting > 0 ? FontWeight.w700 : null,
-            ),
+            color: split.waiting > 0 ? AppColors.warning : AppColors.muted,
+            strong: split.waiting > 0,
           ),
         ),
         DataCell(
-          Text(
+          _Count(
             '${split.accepted}',
-            style: TextStyle(
-              color: split.accepted > 0
-                  ? AppColors.rewardGreen
-                  : AppColors.muted,
-              fontWeight: split.accepted > 0 ? FontWeight.w600 : null,
-            ),
+            color: split.accepted > 0 ? AppColors.rewardGreen : AppColors.muted,
+            strong: split.accepted > 0,
           ),
         ),
         DataCell(
@@ -338,6 +344,28 @@ class GroupHomeworkTab extends StatelessWidget {
       ],
     );
   }
+}
+
+/// One of the counts in the homework table, centred under its heading.
+class _Count extends StatelessWidget {
+  const _Count(this.value, {this.color, this.strong = false});
+  final String value;
+  final Color? color;
+  final bool strong;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 36,
+    child: Center(
+      child: Text(
+        value,
+        style: TextStyle(
+          color: color,
+          fontWeight: strong ? FontWeight.w700 : null,
+        ),
+      ),
+    ),
+  );
 }
 
 class _TopicCell extends StatelessWidget {
@@ -607,6 +635,7 @@ Future<void> showHomeworkForm(
   var lessonId = editing?.lessonId ?? choices.first.id;
   var dueDate = editing?.dueDate ?? _defaultDue();
   final files = <PickedFile>[];
+  final removed = <HomeworkFile>[];
   final saved = await showFormDialog<bool>(
     context: context,
     onDisposed: task.dispose,
@@ -646,18 +675,25 @@ Future<void> showHomeworkForm(
                   ),
                   const SizedBox(height: 14),
                 ],
+                const _FormLabel('Vazifa'),
+                const SizedBox(height: 8),
                 TextField(
                   controller: task,
                   maxLines: 3,
                   decoration: const InputDecoration(
-                    labelText: 'Izoh (nima qilish kerak)',
+                    hintText: 'Nima qilish kerak?',
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 16),
+                const _FormLabel('Muddat'),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.event_outlined),
-                  title: Text('Tugash vaqti: ${_dayTime(dueDate)}'),
+                  leading: const Icon(
+                    Icons.event_outlined,
+                    color: AppColors.primary,
+                  ),
+                  title: Text(_dayTime(dueDate)),
+                  subtitle: const Text('Shu vaqtgacha topshiriladi'),
                   trailing: const Icon(Icons.edit_outlined),
                   onTap: () async {
                     final today = DateUtils.dateOnly(DateTime.now());
@@ -682,10 +718,42 @@ Future<void> showHomeworkForm(
                     }
                   },
                 ),
-                if (editing == null) ...[
-                  const SizedBox(height: 8),
-                  FileDropArea(files: files, onChanged: () => update(() {})),
-                ],
+                const SizedBox(height: 16),
+                const _FormLabel('Fayllar'),
+                const SizedBox(height: 8),
+                // What is already attached, each with a way to take it off.
+                for (final file in editing?.files ?? const <HomeworkFile>[])
+                  if (!removed.contains(file))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.attach_file_rounded,
+                            size: 18,
+                            color: AppColors.muted,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              file.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Faylni olib tashlash',
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              size: 18,
+                              color: AppColors.danger,
+                            ),
+                            onPressed: () => update(() => removed.add(file)),
+                          ),
+                        ],
+                      ),
+                    ),
+                FileDropArea(files: files, onChanged: () => update(() {})),
               ],
             ),
           ),
@@ -720,7 +788,13 @@ Future<void> showHomeworkForm(
             lessonId: lessonId,
             files: List.of(files),
           )
-        : store.updateHomework(editing.id, title: text, dueDate: dueDate),
+        : store.updateHomework(
+            editing.id,
+            title: text,
+            dueDate: dueDate,
+            addedFiles: List.of(files),
+            removedFiles: List.of(removed),
+          ),
     success: editing == null ? 'Uy vazifa qo‘shildi' : 'Saqlandi',
   );
 }
@@ -732,6 +806,18 @@ Future<void> showHomeworkForm(
 const _maxFileBytes = 10 * 1024 * 1024;
 
 /// The tap-to-upload area, with the files picked so far beneath it.
+/// A heading above a field in the homework form.
+class _FormLabel extends StatelessWidget {
+  const _FormLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+  );
+}
+
 class FileDropArea extends StatelessWidget {
   const FileDropArea({super.key, required this.files, required this.onChanged});
 

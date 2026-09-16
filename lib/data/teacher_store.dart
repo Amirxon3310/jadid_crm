@@ -1,6 +1,9 @@
 part of 'crm_store.dart';
 
 /// All attendance dates use the centre's time zone, including browsers abroad.
+/// How long before a lesson starts attendance opens.
+const attendanceLeadMinutes = 10;
+
 DateTime tashkentDate(DateTime time) =>
     time.toUtc().add(const Duration(hours: 5));
 
@@ -490,7 +493,11 @@ extension TeacherStore on CrmStore {
     if (group.lessonStartTime.isEmpty || group.lessonEndTime.isEmpty)
       return true;
     final minutesNow = today.hour * 60 + today.minute;
-    return minutesNow >= _minutesOfDay(group.lessonStartTime) &&
+    // The door opens [attendanceLeadMinutes] before the lesson, so a teacher
+    // can mark the class as it gathers, and shuts when the lesson ends.
+    // Afterwards only an admin can still put the register right.
+    return minutesNow >=
+            _minutesOfDay(group.lessonStartTime) - attendanceLeadMinutes &&
         minutesNow <= _minutesOfDay(group.lessonEndTime);
   }
 

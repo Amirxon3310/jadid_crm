@@ -15,6 +15,7 @@ import 'features/payments_page.dart';
 import 'features/people_page.dart';
 import 'features/profile_page.dart';
 import 'features/student_dashboard_page.dart';
+import 'features/teacher_checkins_page.dart';
 import 'features/teacher_dashboard_page.dart';
 import 'features/workspace.dart';
 
@@ -66,6 +67,11 @@ GoRouter buildRouter(CrmStore store, {String initialLocation = '/'}) =>
               path: '/branches',
               builder: (context, state) =>
                   _page(context, BranchesPage(store: store)),
+            ),
+            GoRoute(
+              path: '/checkins',
+              builder: (context, state) =>
+                  _page(context, TeacherCheckinsPage(store: store)),
             ),
             GoRoute(
               path: '/homeworks',

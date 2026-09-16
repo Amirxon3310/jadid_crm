@@ -1016,9 +1016,9 @@ class _JournalTabState extends State<_JournalTab> {
                   constraints: BoxConstraints(minWidth: constraints.maxWidth),
                   child: DataTable(
                     columnSpacing: 18,
+                    horizontalMargin: 14,
                     headingRowHeight: 64,
                     columns: [
-                      const DataColumn(label: Text('#')),
                       const DataColumn(label: Text('O‘quvchi')),
                       for (final (index, lesson) in lessons.indexed)
                         DataColumn(
@@ -1035,11 +1035,19 @@ class _JournalTabState extends State<_JournalTab> {
                       for (final (index, student) in sortedStudents.indexed)
                         DataRow(
                           cells: [
-                            DataCell(Text('${index + 1}')),
                             DataCell(
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  SizedBox(
+                                    width: 22,
+                                    child: Text(
+                                      '${index + 1}',
+                                      style: const TextStyle(
+                                        color: AppColors.muted,
+                                      ),
+                                    ),
+                                  ),
                                   UserAvatar(
                                     store: store,
                                     user: store.users.firstWhere(
@@ -1078,8 +1086,10 @@ class _JournalTabState extends State<_JournalTab> {
                                                   .status,
                                       ),
                               ),
-                            DataCell(_ScoreText(attendanceScore[student.id]!)),
-                            DataCell(_ScoreText(homeworkScore[student.id]!)),
+                            DataCell(
+                              _PercentBadge(attendanceScore[student.id]!),
+                            ),
+                            DataCell(_PercentBadge(homeworkScore[student.id]!)),
                           ],
                         ),
                     ],
@@ -1225,19 +1235,34 @@ class _LessonColumnLabel extends StatelessWidget {
   }
 }
 
-/// "9 / 9 (100 %)" — the count first, the share of it second.
-class _ScoreText extends StatelessWidget {
-  const _ScoreText(this.score);
+/// A share as one coloured figure: green from 80%, yellow from 60%, red
+/// below. The raw counts are not what a journal is read for.
+class _PercentBadge extends StatelessWidget {
+  const _PercentBadge(this.score);
   final ({int done, int total}) score;
+
   @override
   Widget build(BuildContext context) {
     if (score.total == 0) {
       return const Text('—', style: TextStyle(color: AppColors.muted));
     }
     final percent = (score.done * 100 / score.total).round();
-    return Text(
-      '${score.done} / ${score.total} ($percent %)',
-      style: const TextStyle(fontWeight: FontWeight.w600),
+    final color = percent >= 80
+        ? AppColors.rewardGreen
+        : percent >= 60
+        ? AppColors.warning
+        : AppColors.penaltyRed;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: .45)),
+      ),
+      child: Text(
+        '$percent%',
+        style: TextStyle(color: color, fontWeight: FontWeight.w700),
+      ),
     );
   }
 }

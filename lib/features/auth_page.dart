@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/app_config.dart';
 import '../core/app_theme.dart';
 import '../core/app_notice.dart';
+import '../core/remembered_logins.dart';
 import '../core/app_icon.dart';
 import 'registration_role_picker.dart';
 import '../data/auth_service.dart';
@@ -30,16 +31,31 @@ class _AuthPageState extends State<AuthPage> {
   final name = TextEditingController();
   final login = TextEditingController();
   final password = TextEditingController();
+  final loginFocus = FocusNode();
+  final passwordFocus = FocusNode();
+
+  /// Logins that have signed in on this device, offered as suggestions.
+  List<String> remembered = const [];
   String registrationRole = 'student';
   bool register = false;
   bool loading = false;
   bool passwordVisible = false;
 
   @override
+  void initState() {
+    super.initState();
+    RememberedLogins.load().then((saved) {
+      if (mounted) setState(() => remembered = saved);
+    });
+  }
+
+  @override
   void dispose() {
     name.dispose();
     login.dispose();
     password.dispose();
+    loginFocus.dispose();
+    passwordFocus.dispose();
     super.dispose();
   }
 
@@ -78,6 +94,7 @@ class _AuthPageState extends State<AuthPage> {
         }
       } else {
         await auth.signIn(login.text, password.text);
+        await RememberedLogins.remember(login.text);
       }
     } on AuthException catch (error) {
       _message(switch (error.code) {
@@ -101,6 +118,25 @@ class _AuthPageState extends State<AuthPage> {
     if (!mounted) return;
     showAppNotice(context, text, isError: true);
   }
+
+  Widget _loginField(TextEditingController controller, FocusNode node) =>
+      TextField(
+        controller: controller,
+        focusNode: node,
+        enabled: !loading,
+        autocorrect: false,
+        enableSuggestions: false,
+        decoration: InputDecoration(
+          labelText: 'Login',
+          prefixIcon: const Padding(
+            padding: EdgeInsets.all(14),
+            child: AppIcon('user', size: 20),
+          ),
+          helperText: register
+              ? 'Masalan: ali_karimov'
+              : 'Eski akkaunt uchun email ham kiritish mumkin',
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -140,25 +176,84 @@ class _AuthPageState extends State<AuthPage> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  TextField(
-                    controller: login,
-                    enabled: !loading,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    decoration: InputDecoration(
-                      labelText: 'Login',
-                      prefixIcon: const Padding(
-                        padding: EdgeInsets.all(14),
-                        child: AppIcon('user', size: 20),
-                      ),
-                      helperText: register
-                          ? 'Masalan: ali_karimov'
-                          : 'Eski akkaunt uchun email ham kiritish mumkin',
+                  // The suggestion list only exists when there is
+                  // something to suggest; an empty one still mounts an
+                  // overlay, which trips over its own focus changes.
+                  if (register || remembered.isEmpty)
+                    _loginField(login, loginFocus)
+                  else
+                    RawAutocomplete<String>(
+                      textEditingController: login,
+                      focusNode: loginFocus,
+                      optionsBuilder: (value) {
+                        // Tapping an empty field shows every account that
+                        // has signed in on this device.
+                        final typed = value.text.trim().toLowerCase();
+                        return remembered.where(
+                          (item) => item.toLowerCase().contains(typed),
+                        );
+                      },
+                      onSelected: (value) {
+                        login.text = value;
+                        passwordFocus.requestFocus();
+                      },
+                      fieldViewBuilder:
+                          (context, controller, focusNode, onSubmitted) =>
+                              _loginField(controller, focusNode),
+                      optionsViewBuilder: (context, onSelected, options) =>
+                          Align(
+                            alignment: Alignment.topLeft,
+                            child: Material(
+                              elevation: 6,
+                              borderRadius: BorderRadius.circular(14),
+                              clipBehavior: Clip.antiAlias,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxHeight: 220,
+                                  maxWidth: 390,
+                                ),
+                                child: ListView(
+                                  padding: EdgeInsets.zero,
+                                  shrinkWrap: true,
+                                  children: [
+                                    for (final option in options)
+                                      ListTile(
+                                        leading: const AppIcon(
+                                          'user',
+                                          size: 18,
+                                        ),
+                                        title: Text(option),
+                                        trailing: IconButton(
+                                          tooltip: 'Ro‘yxatdan olib tashlash',
+                                          icon: const Icon(
+                                            Icons.close,
+                                            size: 18,
+                                          ),
+                                          onPressed: () async {
+                                            await RememberedLogins.forget(
+                                              option,
+                                            );
+                                            final saved =
+                                                await RememberedLogins.load();
+                                            if (context.mounted) {
+                                              setState(
+                                                () => remembered = saved,
+                                              );
+                                            }
+                                          },
+                                        ),
+                                        onTap: () => onSelected(option),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                     ),
-                  ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: password,
+                    focusNode: passwordFocus,
                     enabled: !loading,
                     obscureText: !passwordVisible,
                     autocorrect: false,

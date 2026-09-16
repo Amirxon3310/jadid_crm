@@ -691,18 +691,30 @@ class CrmStore extends ChangeNotifier {
     );
   }
 
-  /// Changes what a homework asks for and when it is due.
+  /// Changes what a homework asks for, when it is due, and which files come
+  /// with it. A file taken off is deleted from the bucket once the row has
+  /// been updated, so a failed save never loses it.
   Future<void> updateHomework(
     String homeworkId, {
     required String title,
     required DateTime dueDate,
+    List<PickedFile> addedFiles = const [],
+    List<HomeworkFile> removedFiles = const [],
   }) async {
     final text = title.trim();
     if (text.isEmpty) throw ArgumentError('Vazifani yozing.');
     final homework = homeworks.firstWhere((h) => h.id == resolveId(homeworkId));
     if (!canManageGroup(homework.groupId))
       throw StateError('Vazifani tahrirlashga ruxsat yo‘q.');
-    await _mutate<void>(
+    if ((addedFiles.isNotEmpty || removedFiles.isNotEmpty) &&
+        !homeworkReviewReady)
+      throw homeworkReviewMigration;
+    final gone = {for (final file in removedFiles) file.path};
+    final kept = [
+      for (final file in homework.files)
+        if (!gone.contains(file.path)) file,
+    ];
+    await _mutate<List<HomeworkFile>>(
       apply: () {
         final index = homeworks.indexWhere(
           (h) => h.id == resolveId(homeworkId),
@@ -711,18 +723,44 @@ class CrmStore extends ChangeNotifier {
         homeworks[index] = homeworks[index].copyWith(
           title: text,
           dueDate: dueDate,
+          files: [...kept, ..._pendingFiles(addedFiles)],
         );
       },
       send: () async {
-        await client!
-            .from('assignments')
-            .update({
-              'title': text,
-              'due_at': dueDate.toUtc().toIso8601String(),
-            })
-            .eq('id', _serverId(homeworkId))
-            .select('id')
-            .single();
+        final uploaded = await _uploadHomeworkFiles(
+          homework.groupId,
+          'tasks',
+          addedFiles,
+        );
+        final files = [...kept, ...uploaded];
+        try {
+          await _homeworkWrite(
+            () => client!
+                .from('assignments')
+                .update({
+                  'title': text,
+                  'due_at': dueDate.toUtc().toIso8601String(),
+                  if (addedFiles.isNotEmpty || removedFiles.isNotEmpty)
+                    'files': [for (final file in files) file.toJson()],
+                })
+                .eq('id', _serverId(homeworkId))
+                .select('id')
+                .single(),
+          );
+        } catch (_) {
+          _removeHomeworkFiles(uploaded);
+          rethrow;
+        }
+        // Only now, with the row saved, does the old file go.
+        _removeHomeworkFiles(removedFiles);
+        return files;
+      },
+      reconcile: (files) {
+        final index = homeworks.indexWhere(
+          (h) => h.id == resolveId(homeworkId),
+        );
+        if (index >= 0)
+          homeworks[index] = homeworks[index].copyWith(files: files);
       },
     );
   }
