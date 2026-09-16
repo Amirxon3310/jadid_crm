@@ -232,7 +232,19 @@ class _GroupPageState extends State<GroupPage> {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 1200),
-                    child: pages[shown],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // A pupil seeing only themselves is almost always a
+                        // database that has not had the classmates function
+                        // applied; say so instead of looking empty.
+                        if (isStudent && !widget.store.classmatesReady) ...[
+                          _ClassmatesNotice(),
+                          const SizedBox(height: 16),
+                        ],
+                        pages[shown],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -2111,3 +2123,33 @@ Future<void> showAddAward(
 
 /// The awards table has to exist before points can be handed out. Rather
 /// than a button that does nothing, say which migration is missing.
+
+/// Shown to a pupil when the group looks empty because the database has no
+/// group_classmates function yet.
+class _ClassmatesNotice extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: AppColors.warning.withValues(alpha: .12),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: AppColors.warning.withValues(alpha: .45)),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.info_outline_rounded, color: AppColors.warning),
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Text(
+            'Guruhdoshlar ro‘yxati bazada hali sozlanmagan, shuning uchun '
+            'faqat o‘zingiz ko‘rinasiz.',
+          ),
+        ),
+        TextButton(
+          onPressed: () => showMigrationSetup(context, classmatesMigration),
+          child: const Text('Sozlash'),
+        ),
+      ],
+    ),
+  );
+}

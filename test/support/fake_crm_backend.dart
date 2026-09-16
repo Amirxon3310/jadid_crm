@@ -176,7 +176,15 @@ class FakeCrmBackend {
       }
     }
     if (path.endsWith('/rpc/group_rankings')) return json(<String, dynamic>{});
-    if (path.endsWith('/rpc/group_classmates')) return json(classmates);
+    if (path.endsWith('/rpc/group_classmates')) {
+      if (missingFunctions.contains('group_classmates')) {
+        return json({
+          'code': 'PGRST202',
+          'message': 'Could not find the function public.group_classmates',
+        }, status: 404);
+      }
+      return json(classmates);
+    }
     if (path.endsWith('/rpc/member_login')) return json(memberLogin);
     if (path.endsWith('/rpc/student_rankings'))
       return json({

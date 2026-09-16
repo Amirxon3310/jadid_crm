@@ -899,6 +899,7 @@ class CrmStore extends ChangeNotifier {
   /// two need — who is in the group, their avatar, their state and their
   /// points — and nothing else about them.
   Future<void> _loadClassmates() async {
+    classmateResults.clear();
     if (activeRole != AppRole.student) return;
     for (final group in visibleGroups) {
       final List<dynamic> rows;
@@ -908,9 +909,12 @@ class CrmStore extends ChangeNotifier {
           params: {'p_group_id': _serverId(group.id)},
         );
       } on PostgrestException catch (error) {
-        // PGRST202: the function is not there yet. The pupil then sees only
-        // themselves, as before.
-        if (error.code == 'PGRST202') return;
+        // PGRST202: the function is not there yet. Remember it, so the group
+        // page can hand over the SQL rather than look empty for no reason.
+        if (error.code == 'PGRST202') {
+          _classmatesReady = false;
+          return;
+        }
         rethrow;
       }
       for (final row in rows.cast<Map<String, dynamic>>()) {
@@ -946,6 +950,13 @@ class CrmStore extends ChangeNotifier {
         }
         // Their total comes from the server; none of the attendance or
         // homework behind it is readable here, so the baseline matches.
+        int part(String key) => (row[key] as num?)?.toInt() ?? 0;
+        classmateResults[id] = (
+          homework: part('homework_points'),
+          attendance: part('attendance_points'),
+          reward: part('reward_points'),
+          penalty: part('penalty_points'),
+        );
         _pointTotals[id] = (row['points'] as num?)?.toInt() ?? 0;
         _pointBaseline[id] = localPointsOf(id);
       }
@@ -1483,6 +1494,17 @@ class CrmStore extends ChangeNotifier {
   /// prove it missing.
   bool get groupPlanReady => !isOnline || _groupPlanReady;
   bool _groupPlanReady = true;
+
+  /// False once a load finds the database has no group_classmates function: a
+  /// pupil then sees only themselves, and the app says why instead of quietly
+  /// showing an empty group.
+  bool get classmatesReady => !isOnline || _classmatesReady;
+  bool _classmatesReady = true;
+
+  /// What the server counted for a classmate, whose attendance, homework and
+  /// awards a pupil cannot read directly.
+  final classmateResults =
+      <String, ({int homework, int attendance, int reward, int penalty})>{};
   final branches = <String>[];
   final payments = <PaymentRecord>[];
   Map<String, dynamic> _studentRanks = {};

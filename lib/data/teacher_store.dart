@@ -186,25 +186,35 @@ extension TeacherStore on CrmStore {
 
   /// Points from every homework the pupil got accepted, on the ranking's
   /// scale rather than the 0–100 review score (see [homeworkPointsFor]).
-  int homeworkPointsOf(String userId) => results
-      .where(
-        (r) => r.studentId == userId && r.status == HomeworkStatus.accepted,
-      )
-      .fold(0, (sum, r) => sum + homeworkPointsFor(r.score));
+  int homeworkPointsOf(String userId) =>
+      _fromServer(userId)?.homework ??
+      results
+          .where(
+            (r) => r.studentId == userId && r.status == HomeworkStatus.accepted,
+          )
+          .fold(0, (sum, r) => sum + homeworkPointsFor(r.score));
+
+  /// A classmate's own rows are hidden from a pupil, so their figures come
+  /// from the server instead. Never used for the pupil themselves, whose own
+  /// rows are all here and stay live as they work.
+  ({int homework, int attendance, int reward, int penalty})? _fromServer(
+    String userId,
+  ) => userId == activeUser.id ? null : classmateResults[userId];
 
   /// 10 points per lesson the pupil turned up for, late still counting.
   int attendancePointsOf(String userId) =>
+      _fromServer(userId)?.attendance ??
       lessons
-          .where((l) => l.status != 'cancelled')
-          .where((l) {
-            final value = attendance[l.id]?[userId];
-            return value == AttendanceStatus.present ||
-                value == AttendanceStatus.late;
-          })
-          .map((l) => l.id)
-          .toSet()
-          .length *
-      10;
+              .where((l) => l.status != 'cancelled')
+              .where((l) {
+                final value = attendance[l.id]?[userId];
+                return value == AttendanceStatus.present ||
+                    value == AttendanceStatus.late;
+              })
+              .map((l) => l.id)
+              .toSet()
+              .length *
+          10;
 
   /// Points a pupil earned from lessons alone: attendance plus homework.
   int lessonPointsOf(String userId) =>
@@ -255,14 +265,18 @@ extension TeacherStore on CrmStore {
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
   /// Staff-added rewards, as a positive number.
-  int bonusPointsOf(String userId) => scoreAwards
-      .where((a) => a.studentId == userId && a.amount > 0)
-      .fold(0, (sum, a) => sum + a.amount);
+  int bonusPointsOf(String userId) =>
+      _fromServer(userId)?.reward ??
+      scoreAwards
+          .where((a) => a.studentId == userId && a.amount > 0)
+          .fold(0, (sum, a) => sum + a.amount);
 
   /// Staff-added penalties, as a negative number.
-  int penaltyPointsOf(String userId) => scoreAwards
-      .where((a) => a.studentId == userId && a.amount < 0)
-      .fold(0, (sum, a) => sum + a.amount);
+  int penaltyPointsOf(String userId) =>
+      _fromServer(userId)?.penalty ??
+      scoreAwards
+          .where((a) => a.studentId == userId && a.amount < 0)
+          .fold(0, (sum, a) => sum + a.amount);
 
   int localPointsOf(String userId) =>
       lessonPointsOf(userId) + bonusPointsOf(userId) + penaltyPointsOf(userId);

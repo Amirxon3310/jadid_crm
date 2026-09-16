@@ -66,3 +66,14 @@ const groupPlanMigration = MigrationMissing(
       'qo‘ying va bir marta “Run” bosing. Keyin shu sahifani yangilang.',
   asset: 'supabase/migrations/20260916190000_group_plan_and_resubmit.sql',
 );
+
+/// group_classmates: who else is in a pupil's group, and how they are doing.
+const classmatesMigration = MigrationMissing(
+  title: 'Guruhdoshlarni ko‘rsatish uchun bir marta sozlash',
+  explanation:
+      'O‘quvchi guruhdagi boshqa o‘quvchilarni va ularning natijalarini '
+      'ko‘rishi uchun bazada alohida funksiya kerak, u hali qo‘llanmagan. '
+      'Quyidagi SQL’ni nusxalab, Supabase → SQL Editor’ga qo‘ying va bir '
+      'marta “Run” bosing. Keyin shu sahifani yangilang.',
+  asset: 'supabase/migrations/20260917210000_classmate_results.sql',
+);

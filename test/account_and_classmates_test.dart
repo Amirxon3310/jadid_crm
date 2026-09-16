@@ -20,6 +20,25 @@ void main() {
           'avatar_path': null,
           'study_status': 'active',
           'points': 42,
+          'homework_points': 12,
+          'attendance_points': 30,
+          'reward_points': 5,
+          'penalty_points': -3,
+        },
+        {
+          // The caller's own row: their figures must come from their own
+          // rows, which stay live as they work, not from this.
+          'profile_id': 'student',
+          'membership_id': 3,
+          'enrollment_id': 20,
+          'full_name': 'Student Test',
+          'avatar_path': null,
+          'study_status': 'active',
+          'points': 99,
+          'homework_points': 99,
+          'attendance_points': 99,
+          'reward_points': 99,
+          'penalty_points': -99,
         },
         {
           'profile_id': 'peer-2',
@@ -46,6 +65,32 @@ void main() {
     expect(store.studentById('peer-2', '10').status, 'frozen');
     // Nothing else about them arrives: no phone, no email.
     expect(store.studentById('peer-1', '10').phone, isEmpty);
+
+    // A classmate's own rows are hidden, so the board's columns come from
+    // the server rather than reading as zero.
+    expect(store.homeworkPointsOf('peer-1'), 12);
+    expect(store.attendancePointsOf('peer-1'), 30);
+    expect(store.bonusPointsOf('peer-1'), 5);
+    expect(store.penaltyPointsOf('peer-1'), -3);
+
+    // The pupil's own figures still come from their own rows.
+    expect(store.homeworkPointsOf('student'), isNot(99));
+    expect(store.attendancePointsOf('student'), isNot(99));
+  });
+
+  test('a missing classmates function is noticed, not swallowed', () async {
+    final backend = FakeCrmBackend()
+      ..authId = 'student'
+      ..missingFunctions.add('group_classmates');
+    await backend.signIn();
+    final store = CrmStore.online(backend.client, enableLiveUpdates: false);
+    addTearDown(store.dispose);
+    await store.load();
+
+    // The rest of the app still loads; the group page uses this to say why
+    // the pupil is alone in the list.
+    expect(store.classmatesReady, isFalse);
+    expect(store.groups, isNotEmpty);
   });
 
   test(
