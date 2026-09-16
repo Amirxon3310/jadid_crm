@@ -337,7 +337,7 @@ void main() {
     () async {
       final backend = FakeCrmBackend();
       await backend.signIn();
-      final signUpBackend = FakeCrmBackend();
+      final signUpBackend = FakeCrmBackend()..authId = 'new-account';
       final store = CrmStore.online(
         backend.client,
         enableLiveUpdates: false,
@@ -387,6 +387,7 @@ void main() {
     final backend = FakeCrmBackend();
     await backend.signIn();
     final signUpBackend = FakeCrmBackend()
+      ..authId = 'new-account'
       ..authError = 'Password should be at least 6 characters.';
     final store = CrmStore.online(
       backend.client,
@@ -586,7 +587,7 @@ void main() {
   test('an admin opens a teacher account, and never an admin one', () async {
     final backend = FakeCrmBackend();
     await backend.signIn();
-    final signUpBackend = FakeCrmBackend();
+    final signUpBackend = FakeCrmBackend()..authId = 'new-account';
     final store = CrmStore.online(
       backend.client,
       enableLiveUpdates: false,
@@ -617,6 +618,40 @@ void main() {
         role: AppRole.admin,
       ),
       throwsArgumentError,
+    );
+  });
+
+  test('a server that ignores the chosen role says so', () async {
+    final backend = FakeCrmBackend();
+    await backend.signIn();
+    // The sign-up answers with an id that already belongs to a pupil, which
+    // is what an old registration trigger effectively does: it writes
+    // 'student' whatever was asked for.
+    final signUpBackend = FakeCrmBackend()..authId = 'student';
+    final store = CrmStore.online(
+      backend.client,
+      enableLiveUpdates: false,
+      newAccountClient: () => signUpBackend.client,
+    );
+    addTearDown(store.dispose);
+    await store.load();
+    store.activeRole = AppRole.admin;
+
+    // Asking for a teacher and getting a pupil must not pass in silence.
+    await expectLater(
+      store.createAccount(
+        name: 'Yangi Ustoz',
+        login: 'ustoz09',
+        password: '482100',
+        role: AppRole.teacher,
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('registration_role'),
+        ),
+      ),
     );
   });
 }
