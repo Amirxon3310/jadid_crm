@@ -38,7 +38,7 @@ class LessonCheckinCard extends StatelessWidget {
           ),
           Text(
             checkin != null
-                ? 'Ustoz darsga kelgan • ${shortTime(checkin.checkedAt.toLocal())}'
+                ? 'Ustoz darsga kelgan • ${shortTime(tashkentDate(checkin.checkedAt))}'
                 : canCapture
                 ? 'Avval suratga tushing, keyin davomatni belgilang.'
                 : 'Suratli davomat faqat belgilangan dars kuni ochiladi.',

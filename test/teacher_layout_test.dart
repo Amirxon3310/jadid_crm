@@ -136,6 +136,10 @@ void main() {
     expect(store.groups.last.teacherId, '');
     expect(store.groups.last.weekDays, [1]);
     expect(tester.takeException(), isNull);
+    // The filter bar above the list is taller now, so scroll the tile's
+    // edit button into view before reaching for it.
+    await tester.ensureVisible(find.byTooltip('Guruhni tahrirlash').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Guruhni tahrirlash').last);
     await tester.pumpAndSettle();
     expect(find.text('Guruhni tahrirlash'), findsOneWidget);

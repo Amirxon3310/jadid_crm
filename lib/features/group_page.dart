@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
+import '../core/filter_bar.dart';
 import '../core/migration.dart';
 import '../core/migration_setup.dart';
 import '../core/app_icon.dart';
@@ -959,33 +960,23 @@ class _JournalTabState extends State<_JournalTab> {
               );
               final picker = months.isEmpty
                   ? const SizedBox.shrink()
-                  : SizedBox(
-                      width: 240,
-                      child: DropdownButtonFormField<DateTime?>(
-                        initialValue: selectedMonth,
-                        isExpanded: true,
-                        borderRadius: BorderRadius.circular(16),
-                        decoration: const InputDecoration(
-                          labelText: 'Davr',
-                          prefixIcon: Icon(
-                            Icons.calendar_month_outlined,
-                            size: 20,
-                          ),
-                          isDense: true,
+                  : FilterField<DateTime?>(
+                      label: 'Davr',
+                      icon: Icons.calendar_month_outlined,
+                      active: selectedMonth != null,
+                      value: selectedMonth,
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Hammasi'),
                         ),
-                        items: [
-                          const DropdownMenuItem(
-                            value: null,
-                            child: Text('Hammasi'),
+                        for (final m in months)
+                          DropdownMenuItem(
+                            value: m,
+                            child: Text(_monthLabel(m)),
                           ),
-                          for (final m in months)
-                            DropdownMenuItem(
-                              value: m,
-                              child: Text(_monthLabel(m)),
-                            ),
-                        ],
-                        onChanged: (m) => setState(() => selectedMonth = m),
-                      ),
+                      ],
+                      onChanged: (m) => setState(() => selectedMonth = m),
                     );
               if (constraints.maxWidth < 560) {
                 return Column(

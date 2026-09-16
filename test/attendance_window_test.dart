@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jadid_crm/core/app_theme.dart';
 import 'package:jadid_crm/core/remembered_logins.dart';
 import 'package:jadid_crm/data/crm_store.dart';
+import 'support/fake_crm_backend.dart';
+import 'package:jadid_crm/core/helpers.dart';
 import 'package:jadid_crm/data/models.dart';
 import 'package:jadid_crm/features/teacher_checkins_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -107,5 +109,27 @@ void main() {
     expect(find.text('Sanoq tizimlari'), findsOneWidget);
     expect(find.text('7 daqiqa kech'), findsOneWidget);
     expect(find.text('Xadra Kids N34'), findsOneWidget);
+  });
+
+  test('a check-in is read on the centre\'s clock, not UTC', () async {
+    final backend = FakeCrmBackend();
+    backend.tables['lesson_checkins']!.add({
+      'id': 7,
+      'organization_id': 'org',
+      'lesson_id': 3,
+      'teacher_membership_id': 2,
+      'photo_path': 'teacher/3/1.png',
+      // 04:07 UTC is 09:07 in Tashkent.
+      'checked_at': '2026-09-16T04:07:00Z',
+    });
+    await backend.signIn();
+    final store = CrmStore.online(backend.client, enableLiveUpdates: false);
+    addTearDown(store.dispose);
+    await store.load();
+
+    final checkin = store.checkins.single;
+    expect(shortTime(tashkentDate(checkin.checkedAt)), '09:07');
+    // The instant itself is untouched, so lateness stays right.
+    expect(checkin.checkedAt.toUtc(), DateTime.utc(2026, 9, 16, 4, 7));
   });
 }

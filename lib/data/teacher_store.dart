@@ -155,7 +155,7 @@ extension TeacherStore on CrmStore {
             lessonId: row['lesson_id'].toString(),
             teacherId: teacher.id,
             photoPath: row['photo_path'] as String,
-            checkedAt: DateTime.parse(row['checked_at'] as String),
+            checkedAt: DateTime.parse(row['checked_at'] as String).toLocal(),
           ),
         );
       }

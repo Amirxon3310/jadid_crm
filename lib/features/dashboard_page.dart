@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
+import '../core/filter_bar.dart';
 import '../core/app_icon.dart';
 import '../core/helpers.dart';
 import '../data/crm_store.dart';
@@ -213,35 +214,9 @@ class _DashboardPageState extends State<DashboardPage> {
                     );
                     final search = SizedBox(
                       width: c.maxWidth < 560 ? c.maxWidth : 340,
-                      child: TextField(
+                      child: FilterSearch(
+                        hint: 'Nomi bo‘yicha qidiruv',
                         onChanged: (value) => setState(() => query = value),
-                        decoration: InputDecoration(
-                          hintText: 'Nomi bo‘yicha qidiruv',
-                          hintStyle: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 17,
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.search_rounded,
-                            size: 29,
-                            color: AppColors.muted,
-                          ),
-                          fillColor: dark
-                              ? const Color(0xFF293344)
-                              : const Color(0xFFF1F1F1),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 16,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(30),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(30),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
                       ),
                     );
                     return c.maxWidth < 560

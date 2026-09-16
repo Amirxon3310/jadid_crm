@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
+import '../core/filter_bar.dart';
 import '../core/helpers.dart';
 import '../core/navigation.dart';
 import '../core/user_avatar.dart';
@@ -84,39 +85,65 @@ class _TeacherCheckinsPageState extends State<TeacherCheckinsPage> {
             runSpacing: 12,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              SizedBox(
-                width: 260,
-                child: DropdownButtonFormField<String?>(
-                  initialValue: teacherFilter,
-                  isExpanded: true,
-                  borderRadius: BorderRadius.circular(16),
-                  decoration: const InputDecoration(
-                    labelText: 'Ustoz',
-                    prefixIcon: Icon(Icons.school_outlined, size: 20),
-                    isDense: true,
+              FilterField<String?>(
+                label: 'Ustoz',
+                icon: Icons.school_outlined,
+                active: teacherFilter != null,
+                value: teacherFilter,
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('Barcha ustozlar'),
                   ),
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('Barcha ustozlar'),
+                  for (final entry in teachers.entries)
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value, overflow: TextOverflow.ellipsis),
                     ),
-                    for (final entry in teachers.entries)
-                      DropdownMenuItem(
-                        value: entry.key,
-                        child: Text(
-                          entry.value,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: (value) => setState(() => teacherFilter = value),
+                ],
+                onChanged: (value) => setState(() => teacherFilter = value),
+              ),
+              FilterToggle(
+                label: 'Faqat kechikkanlar',
+                icon: Icons.timer_outlined,
+                value: lateOnly,
+                onChanged: (value) => setState(() => lateOnly = value),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 26),
+                child: ClearFiltersButton(
+                  count: [
+                    teacherFilter != null,
+                    lateOnly,
+                  ].where((on) => on).length,
+                  onPressed: () => setState(() {
+                    teacherFilter = null;
+                    lateOnly = false;
+                  }),
                 ),
               ),
-              FilterChip(
-                label: const Text('Faqat kechikkanlar'),
-                selected: lateOnly,
-                onSelected: (value) => setState(() => lateOnly = value),
-              ),
+            ],
+          ),
+          ActiveFilters(
+            onClearAll: () => setState(() {
+              teacherFilter = null;
+              lateOnly = false;
+            }),
+            filters: [
+              if (teacherFilter != null)
+                (
+                  icon: Icons.school_outlined,
+                  label: 'Ustoz',
+                  value: teachers[teacherFilter] ?? 'Ustoz',
+                  remove: () => setState(() => teacherFilter = null),
+                ),
+              if (lateOnly)
+                (
+                  icon: Icons.timer_outlined,
+                  label: 'Holat',
+                  value: 'Faqat kechikkanlar',
+                  remove: () => setState(() => lateOnly = false),
+                ),
             ],
           ),
           const SizedBox(height: 14),
@@ -204,8 +231,8 @@ class _CheckinRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${shortDate(lesson.startsAt)} • dars '
-                  '${shortTime(lesson.startsAt)}',
+                  '${shortDate(tashkentDate(lesson.startsAt))} • dars '
+                  '${shortTime(tashkentDate(lesson.startsAt))}',
                   style: const TextStyle(fontSize: 12, color: AppColors.muted),
                 ),
               ],
@@ -223,7 +250,7 @@ class _CheckinRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  shortTime(checkin.checkedAt),
+                  shortTime(tashkentDate(checkin.checkedAt)),
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ],

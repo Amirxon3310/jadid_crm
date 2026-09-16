@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
+import '../core/filter_bar.dart';
 import '../core/app_icon.dart';
 import '../data/crm_store.dart';
 import '../core/navigation.dart';
@@ -79,11 +80,8 @@ class _GroupsPageState extends State<GroupsPage> {
         children: [
           LayoutBuilder(
             builder: (context, constraints) {
-              final search = TextField(
-                decoration: const InputDecoration(
-                  hintText: 'Guruh, kurs yoki ustozni qidiring',
-                  prefixIcon: Icon(Icons.search),
-                ),
+              final search = FilterSearch(
+                hint: 'Guruh, kurs yoki ustozni qidiring',
                 onChanged: (value) => setState(() => query = value),
               );
               final addButton = FilledButton.icon(
@@ -112,9 +110,10 @@ class _GroupsPageState extends State<GroupsPage> {
             spacing: 12,
             runSpacing: 12,
             children: [
-              _FilterMenu<String?>(
+              FilterField<String?>(
                 label: 'Holat',
                 icon: Icons.filter_alt_outlined,
+                active: statusFilter != null,
                 value: statusFilter,
                 items: [
                   for (final (value, label) in _statusFilters)
@@ -122,9 +121,10 @@ class _GroupsPageState extends State<GroupsPage> {
                 ],
                 onChanged: (value) => setState(() => statusFilter = value),
               ),
-              _FilterMenu<String?>(
+              FilterField<String?>(
                 label: 'Ustoz',
                 icon: Icons.school_outlined,
+                active: teacherFilter != null,
                 value: teacherFilter,
                 items: [
                   const DropdownMenuItem(
@@ -139,9 +139,10 @@ class _GroupsPageState extends State<GroupsPage> {
                 ],
                 onChanged: (value) => setState(() => teacherFilter = value),
               ),
-              _FilterMenu<_GroupSort>(
+              FilterField<_GroupSort>(
                 label: 'Tartib',
                 icon: sort.icon,
+                active: sort != _GroupSort.name,
                 value: sort,
                 items: [
                   for (final option in _GroupSort.values)
@@ -149,6 +150,53 @@ class _GroupsPageState extends State<GroupsPage> {
                 ],
                 onChanged: (value) => setState(() => sort = value),
               ),
+              Padding(
+                padding: const EdgeInsets.only(top: 26),
+                child: ClearFiltersButton(
+                  count: [
+                    statusFilter != null,
+                    teacherFilter != null,
+                    sort != _GroupSort.name,
+                  ].where((on) => on).length,
+                  onPressed: () => setState(() {
+                    statusFilter = null;
+                    teacherFilter = null;
+                    sort = _GroupSort.name;
+                  }),
+                ),
+              ),
+            ],
+          ),
+          ActiveFilters(
+            onClearAll: () => setState(() {
+              statusFilter = null;
+              teacherFilter = null;
+              sort = _GroupSort.name;
+            }),
+            filters: [
+              if (statusFilter != null)
+                (
+                  icon: Icons.filter_alt_outlined,
+                  label: 'Holat',
+                  value: _statusFilters
+                      .firstWhere((f) => f.$1 == statusFilter)
+                      .$2,
+                  remove: () => setState(() => statusFilter = null),
+                ),
+              if (teacherFilter != null)
+                (
+                  icon: Icons.school_outlined,
+                  label: 'Ustoz',
+                  value: teachers[teacherFilter] ?? 'Ustoz',
+                  remove: () => setState(() => teacherFilter = null),
+                ),
+              if (sort != _GroupSort.name)
+                (
+                  icon: sort.icon,
+                  label: 'Tartib',
+                  value: sort.label,
+                  remove: () => setState(() => sort = _GroupSort.name),
+                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -291,45 +339,6 @@ Color _rateColor(double? rate) => rate == null
     : AppColors.penaltyRed;
 
 const _goodRate = 70.0;
-
-/// A rounded pill that opens a menu — the filters and the sort order sit in
-/// these rather than in a row of chips.
-class _FilterMenu<T> extends StatelessWidget {
-  const _FilterMenu({
-    required this.label,
-    required this.icon,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  final String label;
-  final IconData icon;
-  final T value;
-  final List<DropdownMenuItem<T>> items;
-  final ValueChanged<T> onChanged;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 230,
-    child: DropdownButtonFormField<T>(
-      initialValue: value,
-      isExpanded: true,
-      borderRadius: BorderRadius.circular(16),
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, size: 20),
-        isDense: true,
-      ),
-      items: items,
-      // A nullable T accepts the "all" entry; a non-nullable one never
-      // reports null in the first place.
-      onChanged: (next) {
-        if (next is T) onChanged(next);
-      },
-    ),
-  );
-}
 
 class _StatPill extends StatelessWidget {
   const _StatPill({
