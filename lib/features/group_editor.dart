@@ -1,3 +1,4 @@
+import '../core/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../core/helpers.dart';
 import '../data/crm_store.dart';
@@ -22,6 +23,10 @@ Future<void> editStudyGroup(
   final name = TextEditingController(text: group?.name);
   final course = TextEditingController(text: group?.course);
   final room = TextEditingController(text: group?.room);
+  final totalLessons = TextEditingController(
+    text: group?.totalLessons?.toString() ?? '',
+  );
+  DateTime? startsOn = group?.startsOn;
   String teacherId = group?.teacherId ?? '';
   String status = group?.status ?? 'active';
   String lessonStartTime = group?.lessonStartTime ?? '';
@@ -177,6 +182,39 @@ Future<void> editStudyGroup(
                     controller: room,
                     decoration: const InputDecoration(labelText: 'Xona'),
                   ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: totalLessons,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Umumiy darslar soni',
+                      helperText: 'Kurs necha darsdan iborat',
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(
+                      Icons.event_outlined,
+                      color: AppColors.primary,
+                    ),
+                    title: Text(
+                      startsOn == null
+                          ? 'Boshlanish sanasi'
+                          : 'Boshlanish: ${shortDate(startsOn!)}',
+                    ),
+                    trailing: const Icon(Icons.edit_outlined),
+                    onTap: () async {
+                      final now = DateTime.now();
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: startsOn ?? now,
+                        firstDate: DateTime(now.year - 3),
+                        lastDate: DateTime(now.year + 3),
+                      );
+                      if (picked != null) update(() => startsOn = picked);
+                    },
+                  ),
                 ],
               ),
             ),
@@ -201,6 +239,7 @@ Future<void> editStudyGroup(
   if (saved != true || !context.mounted) return;
   final teacher = staff.where((u) => u.id == teacherId).firstOrNull;
   final weekDays = days.toList()..sort();
+  final lessonCount = int.tryParse(totalLessons.text.trim());
   final groupName = name.text.trim(),
       groupCourse = course.text.trim(),
       groupRoom = room.text.trim(),
@@ -220,6 +259,8 @@ Future<void> editStudyGroup(
             status: status,
             lessonStartTime: lessonStartTime,
             lessonEndTime: lessonEndTime,
+            totalLessons: lessonCount,
+            startsOn: startsOn,
           )
         : store.updateGroup(
             group.copyWith(
@@ -234,6 +275,8 @@ Future<void> editStudyGroup(
               status: status,
               lessonStartTime: lessonStartTime,
               lessonEndTime: lessonEndTime,
+              totalLessons: lessonCount,
+              startsOn: startsOn,
             ),
           ),
   );

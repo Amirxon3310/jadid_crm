@@ -177,6 +177,8 @@ class StudyGroup {
     this.weekDays = const [],
     this.lessonStartTime = '',
     this.lessonEndTime = '',
+    this.totalLessons,
+    this.startsOn,
   });
 
   final String id;
@@ -193,6 +195,36 @@ class StudyGroup {
   // "HH:mm", or '' when the group has no fixed lesson time yet.
   final String lessonStartTime;
   final String lessonEndTime;
+
+  /// How many lessons the course runs for, as staff planned it.
+  final int? totalLessons;
+
+  /// The day the group started.
+  final DateTime? startsOn;
+
+  /// Lessons in a week, from the days it meets.
+  int get lessonsPerWeek => weekDays.isEmpty ? 1 : weekDays.length;
+
+  /// "Toq kunlari", "Juft kunlari", "Haftada bir kun" — how the week is
+  /// filled, read from the days themselves.
+  String get scheduleKindLabel {
+    if (weekDays.isEmpty) return 'Kunlari belgilanmagan';
+    final days = {...weekDays};
+    if (days.length == 1) return 'Haftada bir kun';
+    if (days.difference({1, 3, 5}).isEmpty) return 'Toq kunlari';
+    if (days.difference({2, 4, 6}).isEmpty) return 'Juft kunlari';
+    return 'Haftada ${days.length} kun';
+  }
+
+  /// When the course is due to finish, worked out from the plan and the days
+  /// it meets. Null until both the start and the lesson count are known.
+  DateTime? get endsOn {
+    final total = totalLessons;
+    if (startsOn == null || total == null || total < 1) return null;
+    final weeks = (total / lessonsPerWeek).ceil();
+    return startsOn!.add(Duration(days: weeks * 7 - 1));
+  }
+
   bool get active => status == 'active';
   String get statusLabel => switch (status) {
     'completed' => 'Tugatilgan',
@@ -212,6 +244,8 @@ class StudyGroup {
     List<int>? weekDays,
     String? lessonStartTime,
     String? lessonEndTime,
+    int? totalLessons,
+    DateTime? startsOn,
   }) => StudyGroup(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -226,6 +260,8 @@ class StudyGroup {
     weekDays: List.unmodifiable(weekDays ?? this.weekDays),
     lessonStartTime: lessonStartTime ?? this.lessonStartTime,
     lessonEndTime: lessonEndTime ?? this.lessonEndTime,
+    totalLessons: totalLessons ?? this.totalLessons,
+    startsOn: startsOn ?? this.startsOn,
   );
 }
 
@@ -364,6 +400,7 @@ class HomeworkResult {
     this.reviewFiles = const [],
     this.submittedAt,
     this.reviewedAt,
+    this.resubmitAllowed = true,
   });
 
   final String homeworkId;
@@ -386,6 +423,10 @@ class HomeworkResult {
   List<HomeworkFile> reviewFiles;
   DateTime? submittedAt;
   DateTime? reviewedAt;
+
+  /// Whether a returned answer may be sent again. The teacher decides when
+  /// returning it.
+  bool resubmitAllowed;
 
   /// Whether the pupil has handed anything in.
   bool get hasAnswer => answer.isNotEmpty || files.isNotEmpty;

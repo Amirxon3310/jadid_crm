@@ -419,6 +419,16 @@ extension TeacherStore on CrmStore {
         ? null
         : group.lessonStartTime,
     'lesson_end_time': group.lessonEndTime.isEmpty ? null : group.lessonEndTime,
+    // Sent only once the columns exist, so a group still saves on a database
+    // that has not had the plan migration applied.
+    if (groupPlanReady) ...{
+      'total_lessons': group.totalLessons,
+      'starts_on': group.startsOn == null
+          ? null
+          : '${group.startsOn!.year.toString().padLeft(4, '0')}-'
+                '${group.startsOn!.month.toString().padLeft(2, '0')}-'
+                '${group.startsOn!.day.toString().padLeft(2, '0')}',
+    },
   };
 
   Future<void> updateGroup(StudyGroup group) async {

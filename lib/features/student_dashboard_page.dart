@@ -28,11 +28,8 @@ class _StudentDashboardPageState extends State<StudentDashboardPage> {
                       : 0,
                 ),
       );
-    final selected =
-        groups
-            .where((g) => g.id == store.resolveId(selectedGroup ?? ''))
-            .firstOrNull ??
-        groups.firstOrNull;
+    // No picker any more: the cards below carry each group's own progress.
+    final selected = groups.firstOrNull;
     final progress = selected == null ? null : store.progressFor(selected.id);
     String rank(int? value) => value == null ? '—' : '$value-o‘rin';
     final cards = [
@@ -70,37 +67,6 @@ class _StudentDashboardPageState extends State<StudentDashboardPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (groups.isNotEmpty) ...[
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: DropdownButtonFormField<String>(
-              key: ValueKey(selected!.id),
-              initialValue: selected.id,
-              isExpanded: true,
-              borderRadius: BorderRadius.circular(20),
-              decoration: const InputDecoration(
-                labelText: 'Guruh va kurs',
-                prefixIcon: Padding(
-                  padding: EdgeInsets.all(14),
-                  child: AppIcon('groups', active: true, size: 22),
-                ),
-              ),
-              items: groups
-                  .map(
-                    (g) => DropdownMenuItem(
-                      value: g.id,
-                      child: Text(
-                        '${g.name} • ${g.course}',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (v) => setState(() => selectedGroup = v),
-            ),
-          ),
-          const SizedBox(height: 22),
-        ],
         LayoutBuilder(
           builder: (context, c) {
             final columns = c.maxWidth >= 820

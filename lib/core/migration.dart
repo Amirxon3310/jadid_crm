@@ -54,3 +54,15 @@ const homeworkReviewMigration = MigrationMissing(
       'yangilang.',
   asset: 'supabase/migrations/20260917120000_homework_review_and_files.sql',
 );
+
+/// The group's plan (lesson count, start date) and the flag that says a
+/// returned homework may be sent again.
+const groupPlanMigration = MigrationMissing(
+  title: 'Guruh rejasi uchun bir marta sozlash',
+  explanation:
+      'Guruhning umumiy darslar soni, boshlanish sanasi va uy vazifani qayta '
+      'yuborishga ruxsat berish uchun bazada yangi ustunlar kerak, ular hali '
+      'qo‘llanmagan. Quyidagi SQL’ni nusxalab, Supabase → SQL Editor’ga '
+      'qo‘ying va bir marta “Run” bosing. Keyin shu sahifani yangilang.',
+  asset: 'supabase/migrations/20260916190000_group_plan_and_resubmit.sql',
+);

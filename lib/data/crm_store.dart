@@ -395,6 +395,8 @@ class CrmStore extends ChangeNotifier {
             room: row['room'].toString(),
             status: row['status'] as String? ?? 'active',
             weekDays: List<int>.from(row['week_days'] as List? ?? []),
+            totalLessons: row['total_lessons'] as int?,
+            startsOn: _instant(row['starts_on']),
             lessonStartTime: _shortTime(row['lesson_start_time'] as String?),
             lessonEndTime: _shortTime(row['lesson_end_time'] as String?),
           );
@@ -503,6 +505,7 @@ class CrmStore extends ChangeNotifier {
           reviewFiles: HomeworkFile.listFrom(row, 'review_files'),
           submittedAt: _instant(row['submitted_at']),
           reviewedAt: _instant(row['reviewed_at']),
+          resubmitAllowed: row['resubmit_allowed'] as bool? ?? true,
         ),
       );
     }
@@ -510,6 +513,7 @@ class CrmStore extends ChangeNotifier {
       'assignment_results',
       'review_files',
     );
+    _groupPlanReady = await _hasColumn('groups', 'total_lessons');
     _dashboardMetrics = null;
     if (activeRole == AppRole.admin && _profileFeaturesReady) {
       _dashboardMetrics = DashboardMetrics.fromJson(
@@ -904,6 +908,9 @@ class CrmStore extends ChangeNotifier {
     if (current.status == HomeworkStatus.accepted) {
       throw StateError('Qabul qilingan javobni o‘zgartirib bo‘lmaydi.');
     }
+    if (current.status == HomeworkStatus.returned && !current.resubmitAllowed) {
+      throw StateError('Ustoz bu vazifani qayta yuborishga ruxsat bermagan.');
+    }
     if (answer.trim().isEmpty && files.isEmpty && current.files.isEmpty)
       throw ArgumentError('Izoh yozing yoki fayl biriktiring.');
     if (files.isNotEmpty && !homeworkReviewReady) throw homeworkReviewMigration;
@@ -972,6 +979,7 @@ class CrmStore extends ChangeNotifier {
     required int score,
     required String comment,
     List<PickedFile> files = const [],
+    bool allowResubmit = true,
   }) async {
     if (score < 0 || score > 100)
       throw ArgumentError('Ball 0–100 oralig‘ida bo‘lishi kerak.');
@@ -993,7 +1001,8 @@ class CrmStore extends ChangeNotifier {
           ..status = status
           ..score = score
           ..comment = comment
-          ..reviewedAt = reviewedAt;
+          ..reviewedAt = reviewedAt
+          ..resubmitAllowed = allowResubmit;
         if (files.isNotEmpty) result.reviewFiles = _pendingFiles(files);
       },
       send: () async {
@@ -1012,6 +1021,9 @@ class CrmStore extends ChangeNotifier {
                   'comment': comment,
                   'reviewed_by': int.parse(actor.membershipId),
                   'reviewed_at': reviewedAt.toUtc().toIso8601String(),
+                  // Only once the column exists; before that a review still
+                  // saves, and a returned answer stays open as before.
+                  if (groupPlanReady) 'resubmit_allowed': allowResubmit,
                   if (uploaded.isNotEmpty)
                     'review_files': [
                       for (final file in uploaded) file.toJson(),
@@ -1051,6 +1063,8 @@ class CrmStore extends ChangeNotifier {
     String status = 'active',
     String lessonStartTime = '',
     String lessonEndTime = '',
+    int? totalLessons,
+    DateTime? startsOn,
   }) async {
     if (activeRole != AppRole.admin) throw StateError('Admin huquqi kerak.');
     final temp = _newId();
@@ -1068,6 +1082,8 @@ class CrmStore extends ChangeNotifier {
       status: status,
       lessonStartTime: lessonStartTime,
       lessonEndTime: lessonEndTime,
+      totalLessons: totalLessons,
+      startsOn: startsOn,
     );
     await _mutate<Map<String, dynamic>>(
       apply: () => groups.add(group),
@@ -1299,6 +1315,12 @@ class CrmStore extends ChangeNotifier {
   /// only a load can prove it missing.
   bool get homeworkReviewReady => !isOnline || _homeworkReviewReady;
   bool _homeworkReviewReady = true;
+
+  /// False once a load finds the database predates the group-plan migration
+  /// (lesson count, start date, resubmission). Starts true: only a load can
+  /// prove it missing.
+  bool get groupPlanReady => !isOnline || _groupPlanReady;
+  bool _groupPlanReady = true;
   final branches = <String>[];
   final payments = <PaymentRecord>[];
   Map<String, dynamic> _studentRanks = {};
@@ -1497,6 +1519,7 @@ class _CrmSnapshot {
               reviewFiles: r.reviewFiles,
               submittedAt: r.submittedAt,
               reviewedAt: r.reviewedAt,
+              resubmitAllowed: r.resubmitAllowed,
             ),
           )
           .toList(),
@@ -1585,7 +1608,8 @@ class _CrmSnapshot {
             ..files = saved.files
             ..reviewFiles = saved.reviewFiles
             ..submittedAt = saved.submittedAt
-            ..reviewedAt = saved.reviewedAt;
+            ..reviewedAt = saved.reviewedAt
+            ..resubmitAllowed = saved.resubmitAllowed;
         }),
       );
     store.avatarUrls

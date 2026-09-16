@@ -73,9 +73,15 @@ extension StudentPortalStore on CrmStore {
     final schedule = lessonsOf(
       groupId,
     ).where((l) => l.status != 'cancelled').toList();
+    // Out of the course staff planned, when they have set one; otherwise out
+    // of the lessons that exist so far.
+    final planned = groups
+        .where((g) => g.id == resolveId(groupId))
+        .firstOrNull
+        ?.totalLessons;
     return CourseProgress(
       schedule.where((l) => l.status == 'completed').length,
-      schedule.length,
+      planned ?? schedule.length,
     );
   }
 

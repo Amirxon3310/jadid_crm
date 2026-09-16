@@ -1559,6 +1559,7 @@ class _ReviewPanelState extends State<_ReviewPanel> {
   late int score = initial.score ?? homeworkPassScore;
   late final scoreText = TextEditingController(text: '$score');
   late final comment = TextEditingController(text: initial.comment);
+  late bool allowResubmit = initial.resubmitAllowed;
   final files = <PickedFile>[];
 
   @override
@@ -1581,6 +1582,7 @@ class _ReviewPanelState extends State<_ReviewPanel> {
       score: score,
       comment: comment.text.trim(),
       files: [...files],
+      allowResubmit: allowResubmit,
     );
     Navigator.pop(context);
     if (!host.mounted) return;
@@ -1592,6 +1594,7 @@ class _ReviewPanelState extends State<_ReviewPanel> {
         score: sent.score,
         comment: sent.comment,
         files: sent.files,
+        allowResubmit: sent.allowResubmit,
       ),
       success: sent.score >= homeworkPassScore
           ? 'Qabul qilindi'
@@ -1885,6 +1888,23 @@ class _ReviewPanelState extends State<_ReviewPanel> {
             ),
           ],
         ),
+        // Only a returned answer can come back, so the choice appears with
+        // the score that returns it.
+        if (!passes) ...[
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: allowResubmit,
+            onChanged: (value) => setState(() => allowResubmit = value),
+            title: const Text('Qayta yuborish mumkin'),
+            subtitle: Text(
+              allowResubmit
+                  ? 'O‘quvchi tuzatib qayta yuboradi'
+                  : 'O‘quvchi bu vazifani qayta yubora olmaydi',
+              style: const TextStyle(fontSize: 12, color: AppColors.muted),
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         const Text('Fayllar', style: TextStyle(fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
@@ -2008,7 +2028,9 @@ class _PupilAnswerState extends State<_PupilAnswer> {
     final ended =
         !store.studentById(me, homework.groupId).active ||
         !store.groupById(homework.groupId).active;
-    final locked = ended || result.status == HomeworkStatus.accepted;
+    final blocked =
+        result.status == HomeworkStatus.returned && !result.resubmitAllowed;
+    final locked = ended || result.status == HomeworkStatus.accepted || blocked;
     return Surface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2075,6 +2097,8 @@ class _PupilAnswerState extends State<_PupilAnswer> {
             Text(
               ended
                   ? 'Bu guruhdagi o‘qish tugagan.'
+                  : blocked
+                  ? 'Ustoz bu vazifani qayta yuborishga ruxsat bermagan.'
                   : 'Javobingiz qabul qilingan.',
               style: const TextStyle(color: AppColors.muted),
             )

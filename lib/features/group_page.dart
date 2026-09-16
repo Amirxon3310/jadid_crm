@@ -91,20 +91,28 @@ class _GroupPageState extends State<GroupPage> {
           ),
         ),
       );
-    const labels = [
+    final isStudent = widget.store.activeRole == AppRole.student;
+    const allLabels = [
       'Ma’lumot',
       'Davomat',
       'Uy vazifalari',
       'Jurnal',
       'Reyting',
     ];
-    final pages = [
+    final allPages = [
       _InfoTab(store: widget.store, group: group),
       _AttendanceTab(store: widget.store, group: group),
       GroupHomeworkTab(store: widget.store, group: group),
       _JournalTab(store: widget.store, group: group),
       _RankingTab(store: widget.store, group: group),
     ];
+    // Indexes into the full list, so an address keeps meaning the same tab
+    // whoever opens it.
+    final visible = [0, if (!isStudent) 1, 2, if (!isStudent) 3, 4];
+    final labels = [for (final index in visible) allLabels[index]];
+    final pages = [for (final index in visible) allPages[index]];
+    var shown = visible.indexOf(tab);
+    if (shown < 0) shown = 0;
 
     return Scaffold(
       body: SafeArea(
@@ -183,7 +191,7 @@ class _GroupPageState extends State<GroupPage> {
                           padding: const EdgeInsets.only(left: 4),
                           child: Row(
                             children: List.generate(labels.length, (index) {
-                              final selected = tab == index;
+                              final selected = shown == index;
                               return Padding(
                                 padding: const EdgeInsets.only(
                                   right: 8,
@@ -201,7 +209,8 @@ class _GroupPageState extends State<GroupPage> {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
-                                  onPressed: () => _openTab(group.id, index),
+                                  onPressed: () =>
+                                      _openTab(group.id, visible[index]),
                                   child: Text(labels[index]),
                                 ),
                               );
@@ -222,7 +231,7 @@ class _GroupPageState extends State<GroupPage> {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 1200),
-                    child: pages[tab],
+                    child: pages[shown],
                   ),
                 ),
               ),
@@ -242,7 +251,9 @@ class _InfoTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final students = _visibleStudents(store, group.id);
+    // Everyone in the group, a pupil included: this is where they see who
+    // they are studying with.
+    final students = store.studentsOf(group.id);
     return Column(
       children: [
         Surface(
@@ -275,6 +286,32 @@ class _InfoTab extends StatelessWidget {
                   label: 'Xona',
                   value: group.room,
                   icon: Icons.meeting_room_outlined,
+                ),
+                _Detail(
+                  label: 'Kunlari',
+                  value: group.scheduleKindLabel,
+                  icon: Icons.calendar_view_week_outlined,
+                ),
+                _Detail(
+                  label: 'Umumiy darslar',
+                  value: group.totalLessons == null
+                      ? 'Belgilanmagan'
+                      : '${group.totalLessons} dars',
+                  icon: Icons.menu_book_outlined,
+                ),
+                _Detail(
+                  label: 'Boshlanish sanasi',
+                  value: group.startsOn == null
+                      ? 'Belgilanmagan'
+                      : shortDate(group.startsOn!),
+                  icon: Icons.play_circle_outline,
+                ),
+                _Detail(
+                  label: 'Tugash sanasi',
+                  value: group.endsOn == null
+                      ? 'Reja to‘ldirilmagan'
+                      : shortDate(group.endsOn!),
+                  icon: Icons.flag_outlined,
                 ),
               ];
               if (narrow) return Column(children: details);
@@ -321,10 +358,18 @@ class _InfoTab extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                PersonName(
-                                  userId: student.id,
-                                  name: student.name,
-                                ),
+                                if (store.activeRole == AppRole.student)
+                                  Text(
+                                    student.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  )
+                                else
+                                  PersonName(
+                                    userId: student.id,
+                                    name: student.name,
+                                  ),
                                 Text(
                                   student.phone,
                                   style: const TextStyle(
@@ -1490,7 +1535,9 @@ class _RankingTabState extends State<_RankingTab> {
   @override
   Widget build(BuildContext context) {
     final store = widget.store, group = widget.group;
-    final students = _visibleStudents(store, group.id)
+    // The whole group, a pupil included: a board with one name on it is no
+    // board, and a team of one is no team.
+    final students = [...store.studentsOf(group.id)]
       ..sort((a, b) => store.pointsOf(b.id).compareTo(store.pointsOf(a.id)));
     team.retainWhere((id) => students.any((s) => s.id == id));
     // Staff get a give-points button on every row; it stays visible but
