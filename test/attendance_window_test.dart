@@ -127,9 +127,50 @@ void main() {
     addTearDown(store.dispose);
     await store.load();
 
-    final checkin = store.checkins.single;
-    expect(shortTime(tashkentDate(checkin.checkedAt)), '09:07');
-    // The instant itself is untouched, so lateness stays right.
-    expect(checkin.checkedAt.toUtc(), DateTime.utc(2026, 9, 16, 4, 7));
+    // The instant is what the store owes us; which clock it is read on is
+    // asserted on screen below, where the bug actually was.
+    expect(
+      store.checkins.single.checkedAt.toUtc(),
+      DateTime.utc(2026, 9, 16, 4, 7),
+    );
+  });
+
+  testWidgets('the page shows the centre\'s clock, not UTC', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1500, 1200);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final store = CrmStore()..changeRole(AppRole.admin);
+    addTearDown(store.dispose);
+    // 04:00 UTC is 09:00 in Tashkent; the teacher arrived seven past.
+    final start = DateTime.utc(2026, 9, 16, 4, 0);
+    store.lessons
+      ..clear()
+      ..add(Lesson(id: 'l1', groupId: 'g1', topic: 'Sanoq', startsAt: start));
+    store.checkins
+      ..clear()
+      ..add(
+        LessonCheckin(
+          lessonId: 'l1',
+          teacherId: 'teacher-1',
+          photoPath: 'teacher-1/l1/1.png',
+          checkedAt: start.add(const Duration(minutes: 7)),
+        ),
+      );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: Scaffold(
+          body: SingleChildScrollView(child: TeacherCheckinsPage(store: store)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('09:07'), findsOneWidget);
+    expect(find.text('04:07'), findsNothing, reason: 'that is UTC');
+    expect(find.textContaining('dars 09:00'), findsOneWidget);
+    expect(find.text('7 daqiqa kech'), findsOneWidget);
   });
 }
