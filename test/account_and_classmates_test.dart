@@ -142,7 +142,7 @@ void main() {
     expect(await store.memberLogin('student'), isNull);
   });
 
-  testWidgets('a suggested login and password are four figures', (
+  testWidgets('a suggested login starts with a letter; the password does not', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -176,8 +176,64 @@ void main() {
         .where((text) => text.isNotEmpty)
         .toList();
     expect(fields, hasLength(2), reason: 'the login and the password');
-    for (final value in fields) {
-      expect(value, matches(RegExp(r'^\d{4}$')), reason: value);
-    }
+    // The database checks a username's shape and refuses a leading
+    // digit, so the login is a letter and three figures; the password
+    // is free of that.
+    expect(
+      fields.first,
+      matches(RegExp(r'^[a-z]\d{3}$')),
+      reason: fields.first,
+    );
+    expect(fields.last, matches(RegExp(r'^\d{4}$')), reason: fields.last);
   });
+
+  test('an admin replaces a password; nobody can read the old one', () async {
+    final backend = FakeCrmBackend();
+    await backend.signIn();
+    final store = CrmStore.online(backend.client, enableLiveUpdates: false);
+    addTearDown(store.dispose);
+    await store.load();
+    store.activeRole = AppRole.admin;
+
+    await store.setAccountPassword('student', '4821');
+    expect(backend.passwordResets, hasLength(1));
+    expect(backend.passwordResets.single['p_profile_id'], 'student');
+    expect(backend.passwordResets.single['p_password'], '4821');
+
+    // Too short to be a password at all.
+    await expectLater(
+      store.setAccountPassword('student', '12'),
+      throwsArgumentError,
+    );
+    // Only an admin may.
+    store.activeRole = AppRole.teacher;
+    await expectLater(
+      store.setAccountPassword('student', '4821'),
+      throwsStateError,
+    );
+  });
+
+  test(
+    'without the function, changing a password says which SQL to run',
+    () async {
+      final backend = FakeCrmBackend()
+        ..missingFunctions.add('set_account_password');
+      await backend.signIn();
+      final store = CrmStore.online(backend.client, enableLiveUpdates: false);
+      addTearDown(store.dispose);
+      await store.load();
+      store.activeRole = AppRole.admin;
+
+      await expectLater(
+        store.setAccountPassword('student', '4821'),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('set_account_password'),
+          ),
+        ),
+      );
+    },
+  );
 }

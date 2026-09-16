@@ -20,6 +20,9 @@ class FakeCrmBackend {
   /// Functions that answer with an error, by name and status.
   final rpcErrors = <String, int>{};
 
+  /// Passwords set_account_password was asked to replace.
+  final passwordResets = <Map<String, dynamic>>[];
+
   /// Accounts create_account was asked to make.
   final createdAccounts = <Map<String, dynamic>>[];
 
@@ -189,6 +192,18 @@ class FakeCrmBackend {
       return json(classmates);
     }
     if (path.endsWith('/rpc/member_login')) return json(memberLogin);
+    if (path.endsWith('/rpc/set_account_password')) {
+      if (missingFunctions.contains('set_account_password')) {
+        return json({
+          'code': 'PGRST202',
+          'message': 'Could not find the function public.set_account_password',
+        }, status: 404);
+      }
+      passwordResets.add(
+        Map<String, dynamic>.from(jsonDecode(request.body) as Map),
+      );
+      return json(null);
+    }
     if (path.endsWith('/rpc/create_account')) {
       if (missingFunctions.contains('create_account')) {
         return json({

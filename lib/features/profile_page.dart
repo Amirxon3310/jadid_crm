@@ -1,4 +1,5 @@
 import 'dart:ui' as ui;
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -573,10 +574,23 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 4),
                   const Text(
                     'Parolni ko‘rsatib bo‘lmaydi: u faqat shifrlangan holda '
-                    'saqlanadi, hech kim — admin ham — o‘qiy olmaydi. Parolni '
-                    'almashtirish uchun Supabase panelidagi Authentication '
-                    'bo‘limidan foydalaniladi.',
+                    'saqlanadi, hech kim — admin ham — o‘qiy olmaydi. Lekin '
+                    'yangisini qo‘yib berishingiz mumkin.',
                     style: TextStyle(fontSize: 12, color: AppColors.muted),
+                  ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _changePassword(
+                        context,
+                        widget.store,
+                        widget.userId,
+                        user.name,
+                      ),
+                      icon: const AppIcon('padlock', size: 18),
+                      label: const Text('Parolni almashtirish'),
+                    ),
                   ),
                 ],
                 if (user.role == AppRole.student) ...[
@@ -820,4 +834,73 @@ Future<void> showProfiles(
       openProfile(context, store, selected);
     }
   }
+}
+
+/// Sets a new password for someone else's account. The admin reads the new
+/// one out; nobody can read the old one, here or anywhere.
+Future<void> _changePassword(
+  BuildContext context,
+  CrmStore store,
+  String userId,
+  String name,
+) async {
+  final field = TextEditingController(text: '${1000 + Random().nextInt(9000)}');
+  final entered = await showFormDialog<String>(
+    context: context,
+    onDisposed: field.dispose,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (context, update) => AlertDialog(
+        title: Text('$name uchun yangi parol'),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: field,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Yangi parol',
+                  suffixIcon: IconButton(
+                    tooltip: 'Boshqa raqam',
+                    onPressed: () => update(
+                      () => field.text = '${1000 + Random().nextInt(9000)}',
+                    ),
+                    icon: const Icon(Icons.casino_outlined, size: 20),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Eski parolni hech kim ko‘ra olmaydi. Yangisini o‘zingiz '
+                'egasiga aytib qo‘yasiz.',
+                style: TextStyle(fontSize: 12, color: AppColors.muted),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Bekor qilish'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (field.text.trim().length >= 4) {
+                Navigator.pop(dialogContext, field.text.trim());
+              }
+            },
+            child: const Text('Saqlash'),
+          ),
+        ],
+      ),
+    ),
+  );
+  if (entered == null || !context.mounted) return;
+  await runCrmAction(
+    context,
+    () => store.setAccountPassword(userId, entered),
+    success: 'Yangi parol: $entered',
+  );
 }

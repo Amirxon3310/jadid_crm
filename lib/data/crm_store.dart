@@ -963,6 +963,31 @@ class CrmStore extends ChangeNotifier {
     }
   }
 
+  /// Replaces an account's password. Only an admin may, and the server
+  /// decides that. The old one cannot be read back — only its hash is kept —
+  /// so this replaces rather than reveals.
+  Future<void> setAccountPassword(String userId, String password) async {
+    if (activeRole != AppRole.admin) throw StateError('Admin huquqi kerak.');
+    if (!isOnline) throw UnsupportedError('Faqat serverda ishlaydi.');
+    if (password.trim().length < 4) {
+      throw ArgumentError('Parol kamida 4 ta belgidan iborat bo‘lsin.');
+    }
+    try {
+      await client!.rpc(
+        'set_account_password',
+        params: {'p_profile_id': userId, 'p_password': password},
+      );
+    } on PostgrestException catch (error) {
+      if (error.code == 'PGRST202') {
+        throw StateError(
+          'Parolni almashtirish uchun bazada set_account_password funksiyasi '
+          'kerak: 20260918140000_account_admin.sql ni ishga tushiring.',
+        );
+      }
+      throw ArgumentError(error.message);
+    }
+  }
+
   /// The login an account signs in with. Only an admin may ask, and the
   /// server decides that. A password cannot be read at all — only its hash
   /// is stored — so there is nothing of the sort here.

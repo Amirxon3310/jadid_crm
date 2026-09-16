@@ -35,6 +35,7 @@ flutter:
     - supabase/migrations/20260918090000_homework_file_delete.sql
     - supabase/migrations/20260918100000_registration_role.sql
     - supabase/migrations/20260918120000_create_account.sql
+    - supabase/migrations/20260918140000_account_admin.sql
   fonts:
     - family: SF Pro Display
       fonts:

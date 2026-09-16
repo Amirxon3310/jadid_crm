@@ -8,6 +8,7 @@ import '../core/app_notice.dart';
 import '../core/migration.dart';
 import '../core/migration_setup.dart';
 import '../core/app_theme.dart';
+import '../core/filter_bar.dart';
 import '../core/app_icon.dart';
 import '../core/helpers.dart';
 import '../data/auth_service.dart';
@@ -130,96 +131,12 @@ class PeoplePage extends StatelessWidget {
     name.dispose();
   }
 
-  Widget _students(BuildContext context) {
-    final visibleIds = store.visibleGroups.map((group) => group.id).toSet();
-    final studentUserIds = store.users
-        .where((user) => user.role == AppRole.student)
-        .map((user) => user.id)
-        .toSet();
-    final students = store.students.where((student) {
-      return studentUserIds.contains(student.id) &&
-          (store.activeRole == AppRole.admin ||
-              visibleIds.contains(student.groupId));
-    }).toList();
-
-    return Surface(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _responsiveHeader(
-            title: 'O‘quvchilar ro‘yxati',
-            button: store.activeRole == AppRole.admin
-                ? FilledButton.icon(
-                    onPressed: () => store.isOnline
-                        ? _addAccount(context, store, role: AppRole.student)
-                        : _addStudent(context),
-                    icon: const Icon(Icons.add),
-                    label: const Text('O‘quvchi qo‘shish'),
-                  )
-                : null,
-          ),
-          const SizedBox(height: 16),
-          for (final student in students)
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(vertical: 5),
-              onTap: () => _open(context, student.id),
-              leading: UserAvatar(
-                store: store,
-                user: store.users.firstWhere((u) => u.id == student.id),
-              ),
-              title: Text(
-                student.name,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(
-                '${student.groupId.isEmpty ? 'Guruh biriktirilmagan' : store.groupById(student.groupId).name}${student.phone.isEmpty ? '' : ' • ${student.phone}'}',
-              ),
-              trailing: store.isOnline && store.activeRole == AppRole.admin
-                  ? PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'profile') _open(context, student.id);
-                        if (value == 'group') _assignGroup(context, student);
-                        if (value == 'teacher')
-                          runCrmAction(
-                            context,
-                            () => store.setRole(student.id, AppRole.teacher),
-                          );
-                        if (value == 'delete')
-                          _deleteMember(
-                            context,
-                            store,
-                            store.users.firstWhere((u) => u.id == student.id),
-                          );
-                      },
-                      itemBuilder: (_) => [
-                        const PopupMenuItem(
-                          value: 'profile',
-                          child: Row(
-                            children: [
-                              AppIcon('edit', size: 20),
-                              SizedBox(width: 10),
-                              Text('Profilni tahrirlash'),
-                            ],
-                          ),
-                        ),
-                        if (store.groups.isNotEmpty)
-                          const PopupMenuItem(
-                            value: 'group',
-                            child: Text('Guruhga biriktirish'),
-                          ),
-                        const PopupMenuItem(
-                          value: 'teacher',
-                          child: Text('Ustoz rolini berish'),
-                        ),
-                        _deleteItem(),
-                      ],
-                    )
-                  : const AppIcon('edit', size: 21),
-            ),
-        ],
-      ),
-    );
-  }
+  Widget _students(BuildContext context) => _StudentsList(
+    store: store,
+    onOpen: (id) => _open(context, id),
+    onAssignGroup: (student) => _assignGroup(context, student),
+    onAddOffline: () => _addStudent(context),
+  );
 
   Future<void> _addStudent(BuildContext context) async {
     final name = TextEditingController();
@@ -365,6 +282,15 @@ Widget _responsiveHeader({required String title, Widget? button}) {
 
 String _fourDigits() => '${1000 + Random().nextInt(9000)}';
 
+/// A login the database will accept: a letter first, then three figures.
+/// Still four characters to read out, but never starting with a digit.
+String _suggestedLogin() {
+  const letters = 'abdefghkmnprstuvxyz';
+  final random = Random();
+  return letters[random.nextInt(letters.length)] +
+      '${100 + random.nextInt(900)}';
+}
+
 /// Opens a pupil's or a teacher's account: the login and password start as
 /// four-figure suggestions the admin can accept or type over. Four is short
 /// enough to read out and write down, which is how the centre hands them on.
@@ -375,7 +301,7 @@ Future<void> _addAccount(
 }) async {
   final teacher = role == AppRole.teacher;
   final name = TextEditingController();
-  final login = TextEditingController(text: _fourDigits());
+  final login = TextEditingController(text: _suggestedLogin());
   final password = TextEditingController(text: _fourDigits());
   final form = GlobalKey<FormState>();
   final entered =
@@ -415,7 +341,7 @@ Future<void> _addAccount(
                         suffixIcon: IconButton(
                           tooltip: 'Boshqa raqam',
                           onPressed: () =>
-                              update(() => login.text = _fourDigits()),
+                              update(() => login.text = _suggestedLogin()),
                           icon: const Icon(Icons.casino_outlined, size: 20),
                         ),
                       ),
@@ -536,6 +462,12 @@ Future<void> _saveAccount(
 }
 
 String _accountError(Object error) => switch (error) {
+  // The database checks the login's shape; its own words are unreadable.
+  ArgumentError(:final message)
+      when '$message'.contains('username_format_check') =>
+    'Login bazadagi qoidaga to‘g‘ri kelmadi. Harf bilan boshlanadigan, '
+        'faqat kichik lotin harflari, raqam va _ belgisidan iborat login '
+        'yozing (masalan: a821).',
   ArgumentError(:final message) => '$message',
   // Supabase answers in English; the two an admin actually runs into are
   // worth saying in Uzbek, with the way out.
@@ -621,5 +553,259 @@ Future<void> _deleteMember(
     if (context.mounted) {
       showAppNotice(context, crmActionError(error), isError: true);
     }
+  }
+}
+
+/// The pupils, with a way to find one: by name, by whether they have a group,
+/// and by whether they are still studying.
+class _StudentsList extends StatefulWidget {
+  const _StudentsList({
+    required this.store,
+    required this.onOpen,
+    required this.onAssignGroup,
+    required this.onAddOffline,
+  });
+
+  final CrmStore store;
+  final ValueChanged<String> onOpen;
+  final ValueChanged<Student> onAssignGroup;
+
+  /// The demo dialog used when there is no server to open an account on.
+  final VoidCallback onAddOffline;
+
+  @override
+  State<_StudentsList> createState() => _StudentsListState();
+}
+
+class _StudentsListState extends State<_StudentsList> {
+  String query = '';
+
+  /// null = every pupil, '' = those without a group, otherwise a group id.
+  String? groupFilter;
+
+  /// null = every pupil, true = studying, false = frozen, finished or gone.
+  bool? activeFilter;
+
+  @override
+  Widget build(BuildContext context) {
+    final store = widget.store;
+    final visibleIds = store.visibleGroups.map((group) => group.id).toSet();
+    final studentUserIds = store.users
+        .where((user) => user.role == AppRole.student)
+        .map((user) => user.id)
+        .toSet();
+    final all = store.students.where((student) {
+      return studentUserIds.contains(student.id) &&
+          (store.activeRole == AppRole.admin ||
+              visibleIds.contains(student.groupId));
+    }).toList();
+    final groups = <String, String>{
+      for (final student in all)
+        if (student.groupId.isNotEmpty)
+          student.groupId:
+              store.groups
+                  .where((g) => g.id == student.groupId)
+                  .firstOrNull
+                  ?.name ??
+              'Guruh',
+    };
+    if (groupFilter != null &&
+        groupFilter!.isNotEmpty &&
+        !groups.containsKey(groupFilter)) {
+      groupFilter = null;
+    }
+    final students =
+        all.where((student) {
+          final matchesName = student.name.toLowerCase().contains(
+            query.trim().toLowerCase(),
+          );
+          final matchesGroup =
+              groupFilter == null ||
+              (groupFilter!.isEmpty
+                  ? student.groupId.isEmpty
+                  : student.groupId == groupFilter);
+          final matchesState =
+              activeFilter == null || student.active == activeFilter;
+          return matchesName && matchesGroup && matchesState;
+        }).toList()..sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
+
+    return Surface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _responsiveHeader(
+            title: 'O‘quvchilar ro‘yxati (${students.length})',
+            button: store.activeRole == AppRole.admin
+                ? FilledButton.icon(
+                    onPressed: () => store.isOnline
+                        ? _addAccount(context, store, role: AppRole.student)
+                        : widget.onAddOffline(),
+                    icon: const Icon(Icons.add),
+                    label: const Text('O‘quvchi qo‘shish'),
+                  )
+                : null,
+          ),
+          const SizedBox(height: 16),
+          FilterSearch(
+            hint: 'Ism bo‘yicha qidirish',
+            onChanged: (value) => setState(() => query = value),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              FilterField<String?>(
+                label: 'Guruh',
+                icon: Icons.layers_outlined,
+                active: groupFilter != null,
+                value: groupFilter,
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('Barcha o‘quvchilar'),
+                  ),
+                  const DropdownMenuItem(
+                    value: '',
+                    child: Text('Guruhga biriktirilmagan'),
+                  ),
+                  for (final entry in groups.entries)
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value, overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: (value) => setState(() => groupFilter = value),
+              ),
+              FilterField<bool?>(
+                label: 'Holat',
+                icon: Icons.filter_alt_outlined,
+                active: activeFilter != null,
+                value: activeFilter,
+                items: const [
+                  DropdownMenuItem(value: null, child: Text('Barcha holatlar')),
+                  DropdownMenuItem(value: true, child: Text('Faol')),
+                  DropdownMenuItem(value: false, child: Text('Faol emas')),
+                ],
+                onChanged: (value) => setState(() => activeFilter = value),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 26),
+                child: ClearFiltersButton(
+                  count: [
+                    groupFilter != null,
+                    activeFilter != null,
+                    query.trim().isNotEmpty,
+                  ].where((on) => on).length,
+                  onPressed: () => setState(() {
+                    groupFilter = null;
+                    activeFilter = null;
+                    query = '';
+                  }),
+                ),
+              ),
+            ],
+          ),
+          if (students.isEmpty)
+            const EmptyState(
+              text: 'O‘quvchi topilmadi',
+              icon: Icons.person_search_outlined,
+            ),
+          for (final student in students)
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(vertical: 5),
+              onTap: () => widget.onOpen(student.id),
+              leading: UserAvatar(
+                store: store,
+                user: store.users.firstWhere((u) => u.id == student.id),
+              ),
+              title: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      student.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  StatusTag(student.statusLabel, student.status),
+                ],
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Wrap(
+                  spacing: 14,
+                  runSpacing: 4,
+                  children: [
+                    Text(
+                      student.groupId.isEmpty
+                          ? 'Guruh biriktirilmagan'
+                          : groups[student.groupId] ?? 'Guruh',
+                      style: TextStyle(
+                        color: student.groupId.isEmpty
+                            ? AppColors.penaltyRed
+                            : AppColors.muted,
+                      ),
+                    ),
+                    if (student.phone.isNotEmpty)
+                      Text(
+                        student.phone,
+                        style: const TextStyle(color: AppColors.muted),
+                      ),
+                    Text(
+                      '${store.pointsOf(student.id)} ball',
+                      style: const TextStyle(color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+              trailing: store.isOnline && store.activeRole == AppRole.admin
+                  ? PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'profile') widget.onOpen(student.id);
+                        if (value == 'group') widget.onAssignGroup(student);
+                        if (value == 'teacher')
+                          runCrmAction(
+                            context,
+                            () => store.setRole(student.id, AppRole.teacher),
+                          );
+                        if (value == 'delete')
+                          _deleteMember(
+                            context,
+                            store,
+                            store.users.firstWhere((u) => u.id == student.id),
+                          );
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'profile',
+                          child: Row(
+                            children: [
+                              AppIcon('edit', size: 20),
+                              SizedBox(width: 10),
+                              Text('Profilni tahrirlash'),
+                            ],
+                          ),
+                        ),
+                        if (store.groups.isNotEmpty)
+                          const PopupMenuItem(
+                            value: 'group',
+                            child: Text('Guruhga biriktirish'),
+                          ),
+                        const PopupMenuItem(
+                          value: 'teacher',
+                          child: Text('Ustoz rolini berish'),
+                        ),
+                        _deleteItem(),
+                      ],
+                    )
+                  : const AppIcon('edit', size: 21),
+            ),
+        ],
+      ),
+    );
   }
 }
