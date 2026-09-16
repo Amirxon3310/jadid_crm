@@ -32,6 +32,7 @@ flutter:
     - supabase/migrations/20260916190000_group_plan_and_resubmit.sql
     - supabase/migrations/20260917200000_classmates_and_login.sql
     - supabase/migrations/20260917210000_classmate_results.sql
+    - supabase/migrations/20260918090000_homework_file_delete.sql
   fonts:
     - family: SF Pro Display
       fonts:
