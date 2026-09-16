@@ -444,7 +444,7 @@ extension TeacherStore on CrmStore {
   ) async {
     if (!canManageGroup(groupId))
       throw StateError('Guruhni boshqarishga ruxsat yo‘q.');
-    if (!['active', 'completed', 'left'].contains(status))
+    if (!enrollmentStatuses.any((option) => option.value == status))
       throw ArgumentError('Noto‘g‘ri holat.');
     await _mutate<void>(
       apply: () {
@@ -455,6 +455,7 @@ extension TeacherStore on CrmStore {
         students[index] = students[index].copyWith(
           completed: status == 'completed',
           left: status == 'left',
+          frozen: status == 'frozen',
         );
       },
       send: () async {

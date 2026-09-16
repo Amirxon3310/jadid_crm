@@ -14,6 +14,7 @@ dependencies:
   shared_preferences: ^2.5.5
   file_picker: ^13.0.0
   url_launcher: ^6.3.2
+  go_router: ^17.5.0
 dev_dependencies:
   http: 1.6.0
   flutter_test:
@@ -27,6 +28,7 @@ flutter:
     - supabase/migrations/20260916140000_score_awards.sql
     - supabase/migrations/20260917060000_member_removal_and_answer_files.sql
     - supabase/migrations/20260917120000_homework_review_and_files.sql
+    - supabase/migrations/20260916080000_frozen_enrollment.sql
   fonts:
     - family: SF Pro Display
       fonts:

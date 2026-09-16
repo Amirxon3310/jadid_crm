@@ -762,7 +762,7 @@ class FileDropArea extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Material(
-        color: AppColors.softBlue(context),
+        color: AppColors.panel(context),
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
@@ -882,7 +882,7 @@ class _FileTile extends StatelessWidget {
                 child: Container(
                   width: 124,
                   height: 88,
-                  color: AppColors.softBlue(context),
+                  color: AppColors.panel(context),
                   child: ready && file.isImage
                       ? FutureBuilder<String>(
                           future: _signedUrl(store, file.path),
@@ -1823,7 +1823,7 @@ class _Section extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: AppColors.softBlue(context).withValues(alpha: .45),
+      color: AppColors.panel(context),
       borderRadius: BorderRadius.circular(18),
     ),
     child: Column(

@@ -28,6 +28,14 @@ abstract final class AppColors {
       Theme.of(context).brightness == Brightness.dark
       ? primary.withValues(alpha: .18)
       : const Color(0xFFEAF6FF);
+
+  /// A calm fill for large panels and upload areas. The light theme tints it
+  /// with primary, but on a dark surface a blue wash of this size muddies
+  /// into the background, so there it lifts the surface neutrally instead.
+  static Color panel(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? Colors.white.withValues(alpha: .05)
+      : const Color(0xFFF4F8FD);
 }
 
 final appThemeMode = ValueNotifier<ThemeMode>(ThemeMode.light);
@@ -151,4 +159,36 @@ class EmptyState extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Faol yashil, muzlatgan sariq, ketgan qizil, bitirgan primary ko‘k.
+Color enrollmentColor(String status) => switch (status) {
+  'left' => AppColors.danger,
+  'completed' => AppColors.primary,
+  'frozen' => AppColors.warning,
+  _ => AppColors.success,
+};
+
+/// An enrolment's state. Shown everywhere, edited nowhere but the pupil's
+/// own profile, and only by an admin.
+class StatusTag extends StatelessWidget {
+  const StatusTag(this.label, this.status, {super.key});
+  final String label;
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = enrollmentColor(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
 }

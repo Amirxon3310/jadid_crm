@@ -90,6 +90,7 @@ class Student {
     this.membershipId = '',
     this.completed = false,
     this.left = false,
+    this.frozen = false,
     this.enrolledFrom,
     this.enrolledUntil,
   });
@@ -102,21 +103,29 @@ class Student {
   final String membershipId;
   final bool completed;
   final bool left;
+
+  /// Paused in this group: still enrolled, but not attending for now.
+  final bool frozen;
   // The enrollment's own date range, so a journal can tell "absent" apart
   // from "wasn't in this group yet/anymore" on a given lesson's date.
   final DateTime? enrolledFrom;
   final DateTime? enrolledUntil;
-  bool get active => !completed && !left;
+  // A frozen pupil counts as inactive: the server refuses their homework
+  // and attendance the same way it does for one who has left.
+  bool get active => !completed && !left && !frozen;
   String get status => left
       ? 'left'
       : completed
       ? 'completed'
+      : frozen
+      ? 'frozen'
       : 'active';
-  String get statusLabel => left
-      ? 'Ketgan'
-      : completed
-      ? 'Tugatgan'
-      : 'Aktiv';
+  String get statusLabel => switch (status) {
+    'left' => 'Ketgan',
+    'completed' => 'Bitirgan',
+    'frozen' => 'Muzlatgan',
+    _ => 'Faol',
+  };
   bool enrolledOn(DateTime date) {
     final day = DateTime(date.year, date.month, date.day);
     if (enrolledFrom != null && day.isBefore(enrolledFrom!)) return false;
@@ -129,6 +138,7 @@ class Student {
     String? phone,
     bool? completed,
     bool? left,
+    bool? frozen,
   }) => Student(
     id: id,
     name: name ?? this.name,
@@ -138,10 +148,19 @@ class Student {
     membershipId: membershipId,
     completed: completed ?? this.completed,
     left: left ?? this.left,
+    frozen: frozen ?? this.frozen,
     enrolledFrom: enrolledFrom,
     enrolledUntil: enrolledUntil,
   );
 }
+
+/// The states an enrolment can be in, in the order an admin sees them.
+const enrollmentStatuses = [
+  (value: 'active', label: 'Faol'),
+  (value: 'frozen', label: 'Muzlatgan'),
+  (value: 'completed', label: 'Bitirgan'),
+  (value: 'left', label: 'Ketgan'),
+];
 
 class StudyGroup {
   const StudyGroup({

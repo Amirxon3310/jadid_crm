@@ -322,29 +322,12 @@ class _InfoTab extends StatelessWidget {
                           ),
                         ],
                       );
-                      // Only admin edits enrollment status; a group's own
-                      // teacher can manage lessons/homework but not this.
-                      final status = store.activeRole == AppRole.admin
-                          ? Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: [
-                                for (final option in _enrollmentStatuses)
-                                  ChoiceChip(
-                                    label: Text(option.label),
-                                    selected: student.status == option.value,
-                                    onSelected: (_) => runCrmAction(
-                                      context,
-                                      () => store.setEnrollmentStatus(
-                                        student.id,
-                                        group.id,
-                                        option.value,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            )
-                          : _StatusTag(student.statusLabel, student.status);
+                      // Read-only here for everyone, admin included: the
+                      // status is changed from the pupil's own profile.
+                      final status = StatusTag(
+                        student.statusLabel,
+                        student.status,
+                      );
                       if (constraints.maxWidth < 560) {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1054,7 +1037,7 @@ class _JournalTabState extends State<_JournalTab> {
                                   Text(student.name),
                                   if (student.status != 'active') ...[
                                     const SizedBox(width: 8),
-                                    _StatusTag(
+                                    StatusTag(
                                       student.statusLabel,
                                       student.status,
                                     ),
@@ -1327,41 +1310,6 @@ String _scheduleUnavailableReason(StudyGroup group, DateTime today) {
         '(${group.lessonStartTime}–${group.lessonEndTime}) ochiladi.';
   }
   return 'Hozircha davomat ochilmagan.';
-}
-
-const _enrollmentStatuses = [
-  (value: 'active', label: 'Aktiv'),
-  (value: 'completed', label: 'Tugatgan'),
-  (value: 'left', label: 'Ketgan'),
-];
-
-Color _enrollmentColor(String status) => switch (status) {
-  'left' => AppColors.danger,
-  'completed' => AppColors.primary,
-  _ => AppColors.success,
-};
-
-/// Read-only status label; only admin gets an editable control (see
-/// [_InfoTab]) so a group's own teacher cannot move a student in or out.
-class _StatusTag extends StatelessWidget {
-  const _StatusTag(this.label, this.status);
-  final String label;
-  final String status;
-  @override
-  Widget build(BuildContext context) {
-    final color = _enrollmentColor(status);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(color: color, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
 }
 
 List<Student> _visibleStudents(CrmStore store, String groupId) {
@@ -1648,7 +1596,7 @@ class _RankingTabState extends State<_RankingTab> {
                                   ),
                                   if (student.status != 'active') ...[
                                     const SizedBox(width: 8),
-                                    _StatusTag(
+                                    StatusTag(
                                       student.statusLabel,
                                       student.status,
                                     ),

@@ -417,6 +417,7 @@ class CrmStore extends ChangeNotifier {
             row['study_status'] == 'completed' ||
             (row['study_status'] == null && row['ends_on'] != null),
         left: row['study_status'] == 'left',
+        frozen: row['study_status'] == 'frozen',
         name: user.name,
         phone: user.phone,
         groupId: row['group_id'].toString(),

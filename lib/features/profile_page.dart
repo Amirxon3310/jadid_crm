@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../core/app_notice.dart';
 import '../core/app_icon.dart';
 import '../core/app_theme.dart';
+import '../core/helpers.dart';
 import '../core/user_avatar.dart';
 import '../data/crm_store.dart';
 import '../data/models.dart';
@@ -524,6 +525,94 @@ class _ProfilePageState extends State<ProfilePage> {
                     );
                   },
                 ),
+                if (user.role == AppRole.student) ...[
+                  const SizedBox(height: 26),
+                  const Text(
+                    'Guruhlari',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    admin
+                        ? 'Har bir guruhdagi holatini shu yerdan o‘zgartirasiz.'
+                        : 'Holatni faqat admin o‘zgartiradi.',
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  for (final enrolment in widget.store.students.where(
+                    (s) => s.id == user.id,
+                  ))
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.store.groups
+                                      .where((g) => g.id == enrolment.groupId)
+                                      .firstOrNull
+                                      ?.name ??
+                                  'Guruh',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          if (admin && ready)
+                            SizedBox(
+                              width: 210,
+                              child: DropdownButtonFormField<String>(
+                                key: ValueKey(
+                                  'enrolment-${enrolment.groupId}-'
+                                  '${enrolment.status}',
+                                ),
+                                initialValue: enrolment.status,
+                                isExpanded: true,
+                                borderRadius: BorderRadius.circular(16),
+                                decoration: InputDecoration(
+                                  fillColor: fieldColor,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 10,
+                                  ),
+                                ),
+                                items: [
+                                  for (final option in enrollmentStatuses)
+                                    DropdownMenuItem(
+                                      value: option.value,
+                                      child: Text(option.label),
+                                    ),
+                                ],
+                                onChanged: (value) {
+                                  if (value == null ||
+                                      value == enrolment.status)
+                                    return;
+                                  runCrmAction(
+                                    context,
+                                    () => widget.store.setEnrollmentStatus(
+                                      user.id,
+                                      enrolment.groupId,
+                                      value,
+                                    ),
+                                    success: 'Holat saqlandi',
+                                  );
+                                },
+                              ),
+                            )
+                          else
+                            StatusTag(enrolment.statusLabel, enrolment.status),
+                        ],
+                      ),
+                    ),
+                  if (widget.store.students.every((s) => s.id != user.id))
+                    const Text(
+                      'Guruhga biriktirilmagan',
+                      style: TextStyle(color: AppColors.muted),
+                    ),
+                ],
                 const SizedBox(height: 26),
                 Wrap(
                   spacing: 18,
